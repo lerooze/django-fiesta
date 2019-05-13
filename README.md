@@ -1,20 +1,21 @@
 # Django-fiesta
 
-**Implementation of SDMX information model made easy**
+**An implementation of the SDMX information model using Django**
 
-Fiesta is a project that facilitates when comlete a quick deployment of
+Fiesta is a developing project that aims when complete to fully implement 
 the SDMX information model using the Django web framework.
 
-Full documentation for the project will be available at .
+Full documentation for the project will be available at ... 
 
 ---
 
 # Features 
 
-* Generates database schema to store SDMX structure data (partial)
-* Deployable to many different database servers
+* Generates database schema to store SDMX structure data
+  * Currently supports OrganisationSchemes, Codelists, ConceptSchemes
+* Deployable to many different type of database servers
 * Customizable 
-* Loading external SDMX messages into pythonic dataclass objects.
+* Loads external SDMX messages into pythonic dataclass objects.
 * Implementation of RegistryInterface services (partial).
 * Implementation of SDMX RESTful API (partial).
 
@@ -33,20 +34,6 @@ Full documentation for the project will be available at .
 # Quick Examples
 
 ----
-
-# Requirements
-
-* Python (3.7)
-* Django (2
-* defusedxml(0.6)
-* djangorestframework(3.9)
-* django-treebeard(4.3)
-* inflection(0.3)
-* isodate(0.6)
-* lxml(4.3)
-* python-dateutil(2.8)
-* requests(2.21)
-* PyYAML(5.1)
 
 
 # Quick start 
