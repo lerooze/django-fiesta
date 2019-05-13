@@ -1,0 +1,73 @@
+411: # used
+  short: REPLACING_NOT_ALLOWED
+  text: 
+    en: Deleting or replacing final versionable structures not allowed.  
+412:
+  short: APPENDING_NOT_ALLOWED
+  text:
+    en: Appending already created structure objects not allowed
+421: # used
+  short: SOAP_WS_RETRIEVAL_NOT_IMPLEMENTED
+  text:
+    en: Retreiving object from a SOAP type WS not yet implemented
+422: # used
+  short: NOT_STRUCTURE_URL 
+  text:
+    en: stuctureURL returned a message that is not of structure type 
+423: # used
+  short: NOT_PROPER
+  text:
+    en: stuctureURL returned a message that is not of a proper type 
+424: # used
+  short: NOT_IDENTICAL
+  text:
+    en: stuctureURL returned a message that did not retrieve the proper object 
+425: # used
+  short: NOT_SDMX_STRUCTURE
+  template: true
+  text:
+    en: $loc is not an SDMXML structure file
+431: # used
+  short: PARENT_NOT_FOUND
+  text:
+    en: Item parent not found 
+432: # used
+  short: CODELIST_NOT_FOUND 
+  text:
+    en: Codelist not found and representation object cannot be linked to it 
+433: # used
+  short: AGENCY_NOT_FOUND 
+  text:
+    en: Maintainable artefact not loaded since agency is not registered 
+441:
+  short: NOT_LOADED_EMAIL_NOT_FOUND 
+  text:
+    en: Organisation contact will not be loaded since email is not provided 
+442: # used
+  short: CONTACT_EMAIL_NOT_FOUND 
+  text:
+    en: Email of contact not filled 
+443:
+  short: EMAIL_RECEIVER_NOT_FOUND 
+  text:
+    en: Email of contact of receiver organisation must be submitted 
+444:
+  short: ORG_NOT_FOUND 
+  template: true
+  text:
+    en: Receiver organisation $org not found 
+451: # used
+  short: USER_NOT_ORGANISATION_MEMBER
+  template: true
+  text:
+    en: $user is not a registered contact of organisation $org
+453: # used
+  short: USER_NOT_FOUND
+  template: true
+  text:
+    en: $email is not registered 
+461: # used
+  short: FOOTER_ERRORS
+  template: true
+  text:
+    en: Message has footer errors or warnings $errors
