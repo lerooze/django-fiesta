@@ -2,28 +2,15 @@ language: python
 cache: pip
 dist: xenial
 matrix:
-    fast_finish: true
     include:
-
-      - { python: "3.7", env: DJANGO=2.0 }
-      - { python: "3.7", env: DJANGO=2.1 }
-      - { python: "3.7", env: DJANGO=2.2 }
-      - { python: "3.7", env: DJANGO=master }
-
-      - { python: "3.7", env: TOXENV=base }
-      - { python: "2.7", env: TOXENV=lint }
-      - { python: "2.7", env: TOXENV=docs }
-
       - python: "3.7"
         env: TOXENV=dist
         script:
           - python setup.py bdist_wheel
-          - rm -r djangorestframework.egg-info  # see #6139
-          - tox --installpkg ./dist/djangorestframework-*.whl
+          - rm -r django-fiesta.egg-info  # see #6139
+          - tox --installpkg ./dist/django-fiesta-*.whl
           - tox  # test sdist
 
-    allow_failures:
-      - env: DJANGO=master
 
 install:
     - pip install tox tox-venv tox-travis
@@ -33,7 +20,7 @@ script:
 
 after_success:
     - pip install codecov
-    - codecov -e TOXENV,DJANGO
+    - codecov -e TOXENV
 
 notifications:
     email: false

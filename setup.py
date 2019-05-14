@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import sys
+import setuptools
 from io import open
 
 from setuptools import find_packages, setup
@@ -51,18 +52,7 @@ setup(
     author_email='al459@columbia.edu',
     packages=find_packages(exclude=['tests*']),
     include_package_data=True,
-    install_requires=[
-        'Django>=2.0, 2.1, 2.2',
-        'defusedxml>=0.6',
-        'djangorestframework>=3.9',
-        'django-treebeard>=4.3',
-        'inflection>=0.3',
-        'isodate>=0.6',
-        'lxml>=0.6',
-        'python-dateutil>=2.8',
-        'requests>=2.21',
-        'PyYAML>=5.1'
-    ],
+    install_requires=setuptools.find_packages(),
     python_requires=">=3.7",
     zip_safe=False,
     classifiers=[
