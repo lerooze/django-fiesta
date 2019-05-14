@@ -1,0 +1,6 @@
+include README.md
+include LICENSE.md
+recursive-include fiesta/conf *.yaml
+recursive-include fiesta/conf/schema *.xsd
+global-exclude __pycache__
+global-exclude *.py[co]
