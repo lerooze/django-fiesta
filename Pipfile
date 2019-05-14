@@ -4,10 +4,21 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+tox = "*"
+ipdb = "*"
+jupyter = "*"
 
 [packages]
 django = "*"
 lxml = "*"
+defusedxml = "*"
+djangorestframework = "*"
+inflection = "*"
+django-treebeard = "*"
+python-dateutil = "*"
+pyyaml = "*"
+requests = "*"
+isodate = "*"
 
 [requires]
 python_version = "3.7"
