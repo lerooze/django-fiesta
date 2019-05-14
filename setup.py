@@ -4,7 +4,6 @@ import os
 import re
 import shutil
 import sys
-import setuptools
 from io import open
 
 from setuptools import find_packages, setup
@@ -50,9 +49,20 @@ setup(
     long_description_content_type='text/markdown',
     author='Antonios Loumiotis',
     author_email='al459@columbia.edu',
-    packages=find_packages(exclude=['tests*']),
+    packages=find_packages(exclude=['tests*', 'django-fiesta*']),
     include_package_data=True,
-    install_requires=setuptools.find_packages(),
+    install_requires=[
+        'django>=2.1',
+        'lxml',
+        'defusedxml',
+        'djangorestframework',
+        'inflection',
+        'django-treebeard',
+        'python-dateutil',
+        'pyyaml',
+        'requests',
+        'isodate',
+    ],
     python_requires=">=3.7",
     zip_safe=False,
     classifiers=[
