@@ -7,6 +7,7 @@ verify_ssl = true
 tox = "*"
 ipdb = "*"
 jupyter = "*"
+pipenv-to-requirements = "*"
 
 [packages]
 django = "*"
