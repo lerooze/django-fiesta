@@ -20,11 +20,14 @@ decorator==4.4.0
 defusedxml==0.6.0
 entrypoints==0.3
 filelock==3.0.10
+flake8-tidy-imports==2.0.0
+flake8==3.7.7
 ipdb==0.12
 ipykernel==5.1.0
 ipython-genutils==0.2.0
 ipython==7.5.0
 ipywidgets==7.4.2
+isort==4.3.20
 jedi==0.13.3
 jinja2==2.10.1
 jsonschema==3.0.1
@@ -33,6 +36,7 @@ jupyter-console==6.0.0
 jupyter-core==4.4.0
 jupyter==1.0.0
 markupsafe==1.1.1
+mccabe==0.6.1
 mistune==0.8.4
 more-itertools==7.0.0
 nbconvert==5.5.0
@@ -50,6 +54,8 @@ prometheus-client==0.6.0
 prompt-toolkit==2.0.9
 ptyprocess==0.6.0
 py==1.8.0
+pycodestyle==2.5.0
+pyflakes==2.1.1
 pygments==2.4.0
 pyrsistent==0.15.2
 pytest-cov==2.7.1
@@ -67,7 +73,7 @@ tornado==6.0.2
 tox==3.10.0
 traitlets==4.3.2
 virtualenv-clone==0.5.3
-virtualenv==16.5.0
+virtualenv==16.6.0
 wcwidth==0.1.7
 webencodings==0.5.1
 widgetsnbextension==3.4.2

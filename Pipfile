@@ -11,6 +11,10 @@ pipenv-to-requirements = "*"
 pytest = "*"
 pytest-django = "*"
 pytest-cov = "*"
+flake8 = "*"
+flake8-tidy-imports = "*"
+pycodestyle = "*"
+isort = "*"
 
 [packages]
 django = "*"
