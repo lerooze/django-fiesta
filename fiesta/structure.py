@@ -38,7 +38,6 @@ class SDMXObject:
         self._element_fields = list(self.get_element_fields())
         self._attribute_fields = list(self.get_attribute_fields())
         self._text_field = self.get_text_field()
-        self._model_type = self.get_model_type() 
         self._inner_stop = False
         if element is not None and dbobj:
             raise KeyError('element and dbobj can not be both set')
@@ -252,6 +251,10 @@ class SDMXObject:
         model = getattr(models, self.__class__.__name__, None)
         if not model: return
         return ContentType.objects.get_for_model(model)
+
+    @property
+    def _model_type(self):
+        return self.get_model_type()
 
     def append_error(self, key, **attrs):
         description = api_settings['ERROR_DESCRIPTIONS'][key].text.en
