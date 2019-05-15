@@ -8,6 +8,9 @@ tox = "*"
 ipdb = "*"
 jupyter = "*"
 pipenv-to-requirements = "*"
+pytest = "*"
+pytest-django = "*"
+pytest-cov = "*"
 
 [packages]
 django = "*"
