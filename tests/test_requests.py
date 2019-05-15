@@ -5,10 +5,12 @@ from rest_framework.test import APITestCase
 from fiesta import constants
 from fiesta import models
 from fiesta.parsers import XMLParser
+import pytest
 
 
 class SetUpMixin:
 
+    @pytest.mark.django_db
     def setUp(self):
         ecb_user, _ = User.objects.get_or_create(username='neosdmx.ecb@gmail.com',
                                              first_name='NeoSDMX',

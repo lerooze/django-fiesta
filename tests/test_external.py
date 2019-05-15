@@ -3,8 +3,12 @@ from unittest import TestCase
 from fiesta.parsers import XMLParser
 from fiesta import structure
 
+import pytest
+
+
 class OrganisationSchemeExternalTest(TestCase):
     
+    @pytest.mark.django_db
     def setUp(self):
         self.location = 'https://sdw-wsrest.ecb.europa.eu/service/organisationscheme/SDMX/AGENCIES'
         self.parser = XMLParser()
