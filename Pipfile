@@ -19,7 +19,6 @@ isort = "*"
 [packages]
 django = "*"
 lxml = "*"
-defusedxml = "*"
 djangorestframework = "*"
 inflection = "*"
 django-treebeard = "*"
@@ -27,6 +26,8 @@ python-dateutil = "*"
 pyyaml = "*"
 requests = "*"
 isodate = "*"
+django-modeltranslation = "*"
+pydantic = "*"
 
 [requires]
 python_version = "3.7"

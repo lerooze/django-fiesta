@@ -54,14 +54,13 @@ setup(
     install_requires=[
         'django>=2.1',
         'lxml',
-        'defusedxml',
         'djangorestframework',
         'inflection',
         'django-treebeard',
         'python-dateutil',
         'pyyaml',
         'requests',
-        'isodate',
+        'isodate'
     ],
     python_requires=">=3.7",
     zip_safe=False,

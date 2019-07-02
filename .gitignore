@@ -14,6 +14,7 @@ MANIFEST
 coverage.*
 manage.py
 django_fiesta/
+test_shell.py
 
 !.gitignore
 !.travis.yml

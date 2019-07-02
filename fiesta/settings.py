@@ -1,8 +1,8 @@
 """
-Settings for DJANGO_SDMX are all namespaced in the DJANGO_SDMX setting.
+Settings for FIESTA are all namespaced in the FIESTA setting.
 For example your project's `settings.py` file might look like this:
 
-DJANGO_SDMX = {
+FIESTA = {
     'DEFAULT_LENGTHS': {
         'id_code': 64,
         'name': 128
@@ -10,48 +10,84 @@ DJANGO_SDMX = {
 }
 
 This module provides the `api_setting` object, that is used to access
-DJANGO_SDMX settings, checking for user settings first, then falling
+FIESTA settings, checking for user settings first, then falling
 back to the defaults.
 """
 import os.path
+from importlib import import_module
 
 from django.conf import settings
 from django.test.signals import setting_changed
 
-from .utils.loaders import load_yaml, load_error_descriptions
+DEFAULTS = {
+    'DEFAULT_SENDER_ID': 'FIESTA',
+    'DEFAULT_TINY_STRING_LENGTH': 15, 
+    'DEFAULT_VERY_SMALL_STRING_LENGTH': 31, 
+    'DEFAULT_SMALL_STRING_LENGTH': 63, 
+    'DEFAULT_STRING_LENGTH': 127, 
+    'DEFAULT_LARGE_STRING_LENGTH': 255, 
+    'DEFAULT_SCHEMA_PATH': os.path.join(os.path.expanduser('~'), 'schemas'),
+    'DEFAULT_NEW_USER_PASSWORD': 'not_so_secret_password',
+    'DEFAULT_DATACLASS_MODULE': import_module('fiesta.core.dataclasses')
+}
+
+IMPORT_STRINGS = [
+]
+
+def perform_import(val, setting_name):
+    """
+    If the given setting is a string import notation,
+    then perform the necessary import or imports.
+    """
+    if val is None:
+        return None
+    elif isinstance(val, str):
+        return import_from_string(val, setting_name)
+    elif isinstance(val, (list, tuple)):
+        return [import_from_string(item, setting_name) for item in val]
+    return val
 
 
-MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULTS = load_yaml(os.path.join(MODULE_DIR, 'conf', 'default_settings.yaml'))
-ERROR_DESCRIPTIONS = load_error_descriptions(os.path.join(MODULE_DIR, 'conf', 'error_descriptions.yaml'))
-DEFAULTS.FIESTA['MODULE_DIR'] = MODULE_DIR
-DEFAULTS.FIESTA['ERROR_DESCRIPTIONS'] = ERROR_DESCRIPTIONS 
-DEFAULTS.FIESTA['SCHEMAS'] = os.path.join(MODULE_DIR, 'conf', 'schema')
+def import_from_string(val, setting_name):
+    """
+    Attempt to import a class from a string representation.
+    """
+    try:
+        # Nod to tastypie's use of importlib.
+        module_path, class_name = val.rsplit('.', 1)
+        module = import_module(module_path)
+        return getattr(module, class_name)
+    except (ImportError, AttributeError) as e:
+        class_name = e.__class__.__name__
+        msg = f"Could not import '{val}' for API setting " \
+              f"'{setting_name}'. {class_name}: {e}."
+        raise ImportError(msg)
 
-class APISettings(object):
+class APISettings:
     """
     A settings object, that allows API settings to be accessed as properties.
     For example:
 
-        from hydro_sdmx.settings import api_settings
-        print(api_settings.DEFAULT_CHARVAR_LENGTHS)
+        from fiesta.settings import api_settings
+        print(api_settings.DEFAULT_SCHEMA_PATH)
 
     """
-    def __init__(self, setting, user_settings=None, defaults=None):
-        self._setting = self.__check_setting(setting)
+    def __init__(self, user_settings=None, defaults=None, import_strings=None):
         if user_settings:
             self._user_settings = self.__check_user_settings(user_settings)
-        self.defaults = defaults or DEFAULTS[setting]
+        self.defaults = defaults or DEFAULTS
+        self.import_strings = import_strings or IMPORT_STRINGS
+        self._cached_attrs = set()
 
     @property
     def user_settings(self):
         if not hasattr(self, '_user_settings'):
-            self._user_settings = getattr(settings, self._setting, {})
+            self._user_settings = getattr(settings, 'FIESTA', {})
         return self._user_settings
 
     def __getattr__(self, attr):
         if attr not in self.defaults:
-            raise AttributeError("Invalid %s setting: '%s'" % (self._setting, attr))
+            raise AttributeError(f"Invalid API setting: '{attr}'")
 
         try:
             # Check if present in user settings
@@ -60,33 +96,38 @@ class APISettings(object):
             # Fall back to defaults
             val = self.defaults[attr]
 
+        # Coerce import strings into classes
+        if attr in self.import_strings:
+            val = perform_import(val, attr)
+
         # Cache the result
+        self._cached_attrs.add(attr)
         setattr(self, attr, val)
         return val
 
-    def __check_setting(self, setting):
-        if setting not in ['FIESTA', 'FIESTA_MAXLENGTHS']:
-            raise RuntimeError("The '%s' global setting is not allowed.  Please choose one of the following '%s'" % (setting, ['FIESTA', 'FIESTA_MAXLENGTHS']))
-        return setting
-
     def __check_user_settings(self, user_settings):
-        SETTINGS_DOC = "https://django-SDMX-readthedocs.io/en/stable/api/settings"
-        for setting in DEFAULTS.REMOVED_SETTINGS[self._setting]:
+        SETTINGS_DOC = "https://django-fiesta-readthedocs.io/en/stable/api/settings"
+        for setting in DEFAULTS.REMOVED_SETTINGS:
             if setting in user_settings:
-                raise RuntimeError("The '%s' setting of '%s' settings has been removed. Please refer to '%s' for available settings." % (setting, self._setting, SETTINGS_DOC))
+                raise RuntimeError(
+                    f"The '{setting}' setting of '{self._setting}' settings "
+                    f"has been removed. Please refer to '{SETTINGS_DOC}' for "
+                    f"available settings."
+                )
         return user_settings
 
-api_settings = APISettings('FIESTA', None, DEFAULTS.FIESTA)
-api_maxlen_settings = APISettings('FIESTA_MAXLENGTHS', None,
-                                  DEFAULTS.FIESTA_MAXLENGTHS)
+    def reload(self):
+        for attr in self._cached_attrs:
+            delattr(self, attr)
+        self._cached_attrs.clear()
+        if hasattr(self, '_user_settings'):
+            delattr(self, '_user_settings')
+
+api_settings = APISettings(None, DEFAULTS, IMPORT_STRINGS)
 
 def reload_api_settings(*args, **kwargs):
-    global api_settings
-    global api_maxlen_settings
-    setting, value = kwargs['setting'], kwargs['value']
+    setting = kwargs['setting']
     if setting == 'FIESTA':
-        api_settings = APISettings(setting, value, DEFAULTS[setting])
-    elif setting == 'FIESTA_MAXLENGTHS':
-        api_maxlen_settings = APISettings(setting, value, DEFAULTS[setting])
+        api_settings.reload()
 
 setting_changed.connect(reload_api_settings)

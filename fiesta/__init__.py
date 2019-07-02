@@ -15,7 +15,7 @@ VERSION = __version__
 # # Default datetime input and output formats
 # ISO_8601 = 'iso-8601'
 #
-default_app_config = 'fiesta.apps.FiestaConfig'
+default_app_config = 'fiesta.config.FiestaConfig'
 #
 #
 # class RemovedInDRF310Warning(DeprecationWarning):

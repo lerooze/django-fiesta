@@ -1,1 +1,1 @@
-from .xml.renderer import XMLRenderer
+from fiesta.renderers.xml.renderer import XMLRenderer

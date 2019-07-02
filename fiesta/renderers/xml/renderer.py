@@ -3,8 +3,8 @@ from rest_framework.renderers import BaseRenderer
 from rest_framework.exceptions import UnsupportedMediaType, ParseError
 from lxml.etree import tostring, QName
 
-from ...utils.schema import Schema
-from ... import constants
+from fiesta.core import constants
+from fiesta.utils.schema import Schema
 
 
 class XMLRenderer(BaseRenderer):
@@ -24,7 +24,12 @@ class XMLRenderer(BaseRenderer):
             raise UnsupportedMediaType(media_type)
         tag = self.get_tag(data)
         data = data.unroll()
-        element = data.to_element(tag)
+        registration = getattr(data, '_registration', None)
+        if registration:
+            element = data.to_element(tag, resource=registration.resource,
+                                      detail=registration.detail)
+        else:
+            element = data.to_element(tag)
         schema = Schema(element).schema
         if not schema(element):
             errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]

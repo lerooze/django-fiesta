@@ -27,7 +27,8 @@ class Schema:
 
     def get_main_schema(self):
         """Returns the schema to validate files"""
-        path = os.path.join(api_settings.SCHEMAS, 'SDMXMessage.xsd')
+        path = os.path.join(api_settings.DEFAULT_SCHEMA_PATH, 'xml',
+                            'SDMXMessage.xsd')
         try:
             tree = etree.parse(path)
         except (etree.ParseError, ValueError) as exc:

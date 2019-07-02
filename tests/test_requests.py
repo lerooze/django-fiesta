@@ -58,7 +58,7 @@ class OrganisationRequestTest(SetUpMixin, APITestCase):
         xml = etree.tostring(request_element, xml_declaration=True, encoding='utf-8')
         self.response = self.client.post('/fiesta/wsreg/SubmitStructure/',
                                          xml,
-                                         content_type='application/sdmxml')
+                                         content_type='application/xml')
 
     def test_post_organisation_scheme(self):
         self.assertEqual(self.response.status_code, 200)

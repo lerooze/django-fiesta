@@ -12,15 +12,15 @@ from rest_framework.response import Response
 from tempfile import SpooledTemporaryFile
 import requests
 
-from .compat import detree, etree
+# TODO work on xml security
+from lxml import etree
 from ...utils.schema import Schema
 
 class XMLParser(BaseParser):
     """
     XML parser.
     """
-    media_type = 'application/sdmxml'
-
+    media_type = 'application/xml'
 
     def get_root(self, stream):
         if is_zipfile(stream):
@@ -32,7 +32,7 @@ class XMLParser(BaseParser):
             # undo side effect of is_zipfile
             stream.seek(0)
         try:
-            tree = detree.parse(stream, forbid_dtd=True)
+            tree = etree.parse(stream, forbid_dtd=True)
         except (etree.ParseError, ValueError) as exc:
             raise ParseError('XML parse error - %s' % exc)
         return tree.getroot()
@@ -52,8 +52,6 @@ class XMLParser(BaseParser):
             version = '2.1'
         if version != '2.1':
             raise UnsupportedMediaType(media_type)
-        assert detree, 'XMLParser requires defusedxml to be installed'
-        assert etree, 'XMLParser requires  lxml to be installed'
         root = self.get_root(stream)
         schema = Schema(root).schema
         if not schema(root):
