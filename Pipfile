@@ -15,6 +15,7 @@ flake8 = "*"
 flake8-tidy-imports = "*"
 pycodestyle = "*"
 isort = "*"
+tox-pipenv = "*"
 
 [packages]
 django = "*"
@@ -28,6 +29,7 @@ requests = "*"
 isodate = "*"
 django-modeltranslation = "*"
 pydantic = "*"
+django-fiesta = {editable = true,path = "."}
 
 [requires]
 python_version = "3.7"

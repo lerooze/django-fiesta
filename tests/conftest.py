@@ -4,7 +4,6 @@ import sys
 import django
 from django.core import management
 
-
 def pytest_addoption(parser):
     parser.addoption('--no-pkgroot', action='store_true', default=False,
                      help='Remove package root directory from sys.path, ensuring that '
