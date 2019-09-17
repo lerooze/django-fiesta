@@ -1,6 +1,6 @@
-=====================
-Sample Oscar projects
-=====================
+======================
+Sample Fiesta projects
+======================
 
 Fiesta ships with one sample project: a 'sandbox' site, which is a vanilla
 install of Fiesta using the default settings.
