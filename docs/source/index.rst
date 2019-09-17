@@ -62,10 +62,7 @@ Reference
 .. toctree::
    :maxdepth: 1
 
-   .. Core functionality </ref/core>
-   .. Fiesta's apps </ref/apps/index>
-   .. howto/index
-   .. ref/settings
+   Core functionality </ref/core>
 
 The Oscar open-source project
 =============================
