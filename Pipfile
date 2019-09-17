@@ -15,7 +15,12 @@ flake8 = "*"
 flake8-tidy-imports = "*"
 pycodestyle = "*"
 isort = "*"
-tox-pipenv = "*"
+django-fiesta = {editable = true,path = "."}
+pytest-xdist = "*"
+pdbpp = "*"
+pytest-spec = "*"
+django-extensions = "*"
+pydotplus = "*"
 
 [packages]
 django = "*"
@@ -24,12 +29,11 @@ djangorestframework = "*"
 inflection = "*"
 django-treebeard = "*"
 python-dateutil = "*"
-pyyaml = "*"
 requests = "*"
 isodate = "*"
 django-modeltranslation = "*"
-pydantic = "*"
 django-fiesta = {editable = true,path = "."}
+django-oscar = "*"
 
 [requires]
 python_version = "3.7"

@@ -1,4 +1,6 @@
-from fiesta.core.application import BaseFiestaConfig
+# apps.py
+
+from ...core.application import BaseFiestaConfig
 
 class RegistryConfig(BaseFiestaConfig):
     label = 'registry'

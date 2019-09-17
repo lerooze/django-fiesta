@@ -12,3 +12,4 @@ class FiestaConfig(BaseFiestaConfig):
         self.base_app = apps.get_app_config('base')
         self.codelist_app = apps.get_app_config('codelist')
         self.conceptscheme_app = apps.get_app_config('conceptscheme')
+        self.datastructure_app = apps.get_app_config('datastructure')

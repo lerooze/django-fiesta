@@ -10,13 +10,13 @@ errors = {
     ),
 }
 patterns = {
-    'NestedIDType': "[A-Za-z0-9_@$\-]+(\.[A-Za-z0-9_@$\-]+)*",
-    'TwoLevelIDType': "[A-Za-z0-9_@$\-]+\.[A-Za-z0-9_@$\-]+",
-    'IDType': "^[A-Za-z0-9_@$\-]+$",
-    'NCNameIDType': "[A-Za-z][A-Za-z0-9_\-]*",
-    'NestedNCNameIDType': "[A-Za-z][A-Za-z0-9_\-]*(\.[A-Za-z][A-Za-z0-9_\-]*)*",
-    'SingleNCNameIDType': "[A-Za-z][A-Za-z0-9_\-]*",
-    'VersionType': "[0-9]+(\.[0-9]+)*",
+    'NestedIDType': r"[A-Za-z0-9_@$\-]+(\.[A-Za-z0-9_@$\-]+)*",
+    'TwoLevelIDType': r"[A-Za-z0-9_@$\-]+\.[A-Za-z0-9_@$\-]+",
+    'IDType': r"^[A-Za-z0-9_@$\-]+$",
+    'NCNameIDType': r"[A-Za-z][A-Za-z0-9_\-]*",
+    'NestedNCNameIDType': r"[A-Za-z][A-Za-z0-9_\-]*(\.[A-Za-z][A-Za-z0-9_\-]*)*",
+    'SingleNCNameIDType': r"[A-Za-z][A-Za-z0-9_\-]*",
+    'VersionType': r"[0-9]+(\.[0-9]+)*",
 }
 
 re_validators = {

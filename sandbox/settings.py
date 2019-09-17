@@ -12,18 +12,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'treebeard',
     'rest_framework',
+    'django_extensions',
     'fiesta',
     'fiesta.apps.registry',
     'fiesta.apps.common',
     'fiesta.apps.base',
     'fiesta.apps.codelist',
     'fiesta.apps.conceptscheme',
+    'fiesta.apps.datastructure'
 ]
-ROOT_URLCONF = 'django_fiesta.urls'
+ROOT_URLCONF = 'urls'
 DATABASES={
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.path.join(BASE_DIR, 'sandbox', 'db.sqlite3'),
     }
 }
 

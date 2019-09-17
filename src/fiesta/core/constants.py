@@ -234,9 +234,9 @@ PACKAGE_TYPES = (
 )
 
 DIMENSION_TYPES =(
-    ('dimension', 'Dimension'),
-    ('time', 'TimeDimension'),
-    ('measure', 'MeasureDimension')
+    ('Dimension', 'Dimension'),
+    ('TimeDimension', 'TimeDimension'),
+    ('MeasureDimension', 'MeasureDimension')
 )
 
 METATDATA_TARGET_COMPONENTS = (
@@ -350,6 +350,11 @@ STATUSES = (
     ('Failure', 'Failure')
 )
 
+ASSIGNMENT_STATUS = (
+    ('Mandatory', 'Mandatory'),
+    ('Conditional', 'Conditional')
+)
+
 RESOURCE2MAINTAINABLE = {
     'organisationscheme': ('agency_scheme', 'data_consumer_scheme',
                            'data_provider_scheme', 'organisation_unit_scheme'),
@@ -358,5 +363,7 @@ RESOURCE2MAINTAINABLE = {
     'dataconsumerscheme': 'data_consumer_scheme',
     'organisationunitscheme': 'organisation_unit_scheme',
     'conceptscheme': 'concept_scheme',
-    'codelist': 'codelist'
+    'codelist': 'codelist',
+    'datastructure': 'data_structure',
+    'dataflow': 'dataflow',
 }

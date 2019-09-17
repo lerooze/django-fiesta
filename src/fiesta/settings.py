@@ -3,10 +3,8 @@ Settings for FIESTA are all namespaced in the FIESTA setting.
 For example your project's `settings.py` file might look like this:
 
 FIESTA = {
-    'DEFAULT_LENGTHS': {
-        'id_code': 64,
-        'name': 128
-    },
+    'DEFAULT_SENDER_ID': 'SDMXOPEN',
+    'DEFAULT_STRING_LENGTH: 31 
 }
 
 This module provides the `api_setting` object, that is used to access
@@ -28,7 +26,7 @@ DEFAULTS = {
     'DEFAULT_LARGE_STRING_LENGTH': 255, 
     'DEFAULT_SCHEMA_PATH': os.path.join(os.path.expanduser('~'), 'schemas'),
     'DEFAULT_NEW_USER_PASSWORD': 'not_so_secret_password',
-    'DEFAULT_DATACLASS_MODULE': import_module('fiesta.core.dataclasses')
+    'DEFAULT_SERIALIZER_MODULE': 'fiesta.core.serializers.structure'
 }
 
 IMPORT_STRINGS = [

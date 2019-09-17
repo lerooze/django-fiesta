@@ -1,9 +1,5 @@
-VENV = venv
-PYTEST = $(PWD)/$(VENV)/bin/py.test
-
 # These targets are not files
-.PHONY: build_sandbox clean compile_translations coverage css docs extract_translations help install install-python \
- install-test install-js lint release retest sandbox_clean sandbox_image sandbox test todo venv
+.PHONY: docs sandbox
 
 help: ## Display this help message
 	@echo "Please use \`make <target>\` where <target> is one of"
@@ -13,58 +9,37 @@ help: ## Display this help message
 ##################
 # Install commands
 ##################
+init:
+	pip install pipenv --upgrade
+	pipenv install --dev
+	
+# install-migrations-testing-requirements: ## Install migrations testing requirements
+# 	pipenv install -r requirements_migrations.txt
 
-# install: install-python install-test install-js ## Install requirements for local development and production
-install: install-python install-test ## Install requirements for local development and production
+#############################
+# Migrations commands
+#############################
+build_migrations: migrations_reset migrations_make
 
-install-python: ## Install python requirements
-	pip install -r requirements.txt
+migrations_reset:
+	find . -path "./src/fiesta/apps/*/migrations/*.py" -not -name "__init__.py" -delete
+	find . -path "./src/fiesta/apps/*/migrations/*.pyc"  -delete
 
-install-test: ## Install test requirements
-	pip install -e .[test]
-
-install-migrations-testing-requirements: ## Install migrations testing requirements
-	pip install -r requirements_migrations.txt
-
-install-js: ## Install js requirements
-	npm install
-
-venv: ## Create a virtual env and install test and production requirements
-	virtualenv --python=$(shell which python3) $(VENV)
-	$(VENV)/bin/pip install -e .[test]
-	$(VENV)/bin/pip install -r docs/requirements.txt
+migrations_make:
+	sandbox/manage.py makemigrations
 
 #############################
 # Sandbox management commands
 #############################
-sandbox: install build_sandbox ## Install requirements and create a sandbox
+sandbox: init build_sandbox
 
-build_sandbox: sandbox_clean sandbox_load_user sandbox_load_data ## Creates a sandbox from scratch
+build_sandbox: sandbox_clean
 
 sandbox_clean: ## Clean sandbox images,cache,static and database
 	# Remove media
-	-rm -rf sandbox/public/media/images
-	-rm -rf sandbox/public/media/cache
-	-rm -rf sandbox/public/static
-	-rm -f sandbox/db.sqlite
+	-rm -f sandbox/db.sqlite3
 	# Create database
 	sandbox/manage.py migrate
-
-sandbox_load_user: ## Load user data into sandbox
-	sandbox/manage.py loaddata sandbox/fixtures/auth.json
-
-sandbox_load_data: ## Import fixtures and collect static
-	# Import some fixtures. Order is important as JSON fixtures include primary keys
-	sandbox/manage.py loaddata sandbox/fixtures/child_products.json
-	sandbox/manage.py oscar_import_catalogue sandbox/fixtures/*.csv
-	sandbox/manage.py oscar_import_catalogue_images sandbox/fixtures/images.tar.gz
-	sandbox/manage.py oscar_populate_countries --initial-only
-	sandbox/manage.py loaddata sandbox/fixtures/pages.json sandbox/fixtures/ranges.json sandbox/fixtures/offers.json
-	sandbox/manage.py loaddata sandbox/fixtures/orders.json
-	sandbox/manage.py clear_index --noinput
-	sandbox/manage.py update_index catalogue
-	sandbox/manage.py thumbnail cleanup
-	sandbox/manage.py collectstatic --noinput
 
 sandbox_image: ## Build latest docker image of django-oscar-sandbox
 	docker build -t django-oscar-sandbox:latest .
@@ -72,47 +47,24 @@ sandbox_image: ## Build latest docker image of django-oscar-sandbox
 ##################
 # Tests and checks
 ##################
-test: venv ## Run tests
-	$(PYTEST)
-
-retest: venv ## Run failed tests only
-	$(PYTEST) --lf
-
-coverage: venv ## Generate coverage report
-	$(PYTEST) --cov=oscar --cov-report=term-missing
-
-lint: ## Run flake8 and isort checks
-	flake8 src/oscar/
-	flake8 tests/
-	isort -q --recursive --diff src/
-	isort -q --recursive --diff tests/
-
-test_migrations: install-migrations-testing-requirements ## Tests migrations
+test_migrations: 
+	# install-migrations-testing-requirements
 	cd sandbox && ./test_migrations.sh
 
-#######################
-# Translations Handling
-#######################
-extract_translations: ## Extract strings and create source .po files
-	cd src/oscar; django-admin.py makemessages -a
-
-compile_translations: ## Compile translation files and create .mo files
-	cd src/oscar; django-admin.py compilemessages
+test:
+	# This runs all of the tests, on both Python 2 and Python 3.
+	detox
 
 ######################
 # Project Management
 ######################
-css: install-js ## Compile css files
-	npm run build
-
 clean: ## Remove files not in source control
 	find . -type f -name "*.pyc" -delete
-	find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
-	find . -path "*/migrations/*.pyc" -delete
 	rm -rf nosetests.xml coverage.xml htmlcov *.egg-info *.pdf dist violations.txt
 
-docs: venv ## Compile docs
-	make -C docs html SPHINXBUILD=$(PWD)/$(VENV)/bin/sphinx-build
+docs: ## Compile docs
+	cd docs && make html
+	@echo "\033[95m\n\nBuild successful! View the docs homepage at docs/_build/html/index.html.\n\033[0m"
 
 todo: ## Look for areas of the code that need updating when some event has taken place (like Oscar dropping support for a Django version)
 	-grep -rnH TODO *.txt
@@ -124,4 +76,23 @@ release: clean ## Creates release
 	rm -rf dist/*
 	python setup.py sdist bdist_wheel
 	twine upload -s dist/*
+
+flake8:
+	pipenv run flake8 --ignore=E501,F401,E128,E402,E731,F821 requests
+
+coverage:
+	pipenv run py.test --cov-config .coveragerc --verbose --cov-report term --cov-report xml --cov=requests tests
+
+ci:
+	pipenv run py.test -n 8 --boxed --junitxml=report.xml
+
+#######################
+# Translations Handling
+#######################
+extract_translations: ## Extract strings and create source .po files
+	cd src/oscar; django-admin.py makemessages -a
+
+compile_translations: ## Compile translation files and create .mo files
+	cd src/oscar; django-admin.py compilemessages
+
 

@@ -1,21 +1,57 @@
+# Packaging
 *.pyc
-*.db
-*~
-.*
-
-/site/
-/htmlcov/
-/coverage/
-/build/
+__pycache__
+*.egg-info
 /dist/
-/*.egg-info/
-/env/
-MANIFEST
-coverage.*
-manage.py
-django_fiesta/
-test_shell.py
+/build/
+/node_modules/
 
-!.gitignore
-!.travis.yml
-!.isort.cfg
+#pipenv
+Pipfile.lock
+
+# Vagrant
+.vagrant
+
+# Temporary/OS files
+*.swp
+*.swo
+*.*~
+.~lock.*
+*.DS_Store
+.python-version
+
+# IDE files
+.project
+.pydevproject
+.settings
+.idea
+.vscode
+
+# Docs
+/docs/build/*
+*.pdf
+TODO
+venv
+
+# Test files
+.coverage
+.coverage\.*
+.noseids
+coverage.xml
+violations.txt
+nosetests.xml
+/.cache/
+/.pytest_cache/
+/htmlcov/*
+/.tox/*
+
+# Sandbox content
+settings_local.py
+/sandbox/*.sqlite
+/sandbox/assets/
+/sandbox/public/
+/sandbox/whoosh_index/
+/sandbox/logs/
+
+# Private
+test_shell.py

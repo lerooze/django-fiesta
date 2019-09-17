@@ -89,9 +89,8 @@ FIESTA_2402_REPRESENTATION_CODELIST_NOT_REGISTERED = CommonStatusMessage(
 #433
 FIESTA_2403_AGENCY_NOT_REGISTERED = CommonStatusMessage(
     2403,
-    _('Maintainable artefact\'s agency not registered')
+    _("Maintainable artefact's agency not registered")
 )
-
 #441
 FIESTA_2404_NO_EMAIL = CommonStatusMessage(
     2404,
@@ -100,6 +99,10 @@ FIESTA_2404_NO_EMAIL = CommonStatusMessage(
 FIESTA_2405_PARENT_NOT_IN_SCHEME = CommonStatusMessage(
     2405,
     _('Parent organisation does not belong to the child organisation scheme and will be ignored')
+)
+FIESTA_2406_AGENCY_NOT_REGISTERED = CommonStatusMessage(
+    2406,
+    _("Maintainable artefact does not exist")
 )
 FIESTA_2501_NOT_SUPPORTED_LANGUAGE = CommonStatusMessage(
     2501,

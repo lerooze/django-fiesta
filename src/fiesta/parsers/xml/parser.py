@@ -4,8 +4,6 @@ Provides XML parsing support.
 from importlib import import_module
 from zipfile import ZipFile, is_zipfile
 
-import os.path
-
 from rest_framework.exceptions import ParseError, UnsupportedMediaType
 from rest_framework.parsers import BaseParser
 from rest_framework.response import Response
@@ -32,7 +30,7 @@ class XMLParser(BaseParser):
             # undo side effect of is_zipfile
             stream.seek(0)
         try:
-            tree = etree.parse(stream, forbid_dtd=True)
+            tree = etree.parse(stream)
         except (etree.ParseError, ValueError) as exc:
             raise ParseError('XML parse error - %s' % exc)
         return tree.getroot()
@@ -40,7 +38,6 @@ class XMLParser(BaseParser):
     def validate_roottag(self):
         if not self.root.tag.endswith('RegistryInterface'):
             raise ParseError('Use a RegistryInterface SDMXML message for a POST submission Request')
-
 
     def parse(self, stream, media_type=None, parser_context=None):
         """
@@ -54,26 +51,26 @@ class XMLParser(BaseParser):
             raise UnsupportedMediaType(media_type)
         root = self.get_root(stream)
         schema = Schema(root).schema
-        if not schema(root):
-            errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]
-            raise ParseError(errors)
-        dataclass = self.get_dataclass(root)
-        return dataclass(element=root)
+        if schema:
+            if not schema(root):
+                errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]
+                raise ParseError(errors)
+        serializer = self.get_serializer(root)
+        return serializer(root)
 
-    def get_dataclass(self, root):
+    def get_serializer(self, root):
         payload_tag = etree.QName(root[1].tag).localname
-        tag = root.tag
-        specific = etree.QName(tag).localname.endswith('StructureSpecific')
-        if specific:
-            raise ParseError('Parsing StructureSpecic dataset or metadataset not yet implemented')
+        if payload_tag == 'SubmitStructureRequest':
+            serializers = import_module('fiesta.core.serializers.structure')
+            return serializers.RegistryInterfaceSubmitStructureRequestSerializer
+        elif payload_tag == 'SubmitRegistrationsRequest':
+            serializers = import_module('fiesta.core.serializers.structure')
+            return serializers.RegistryInterfaceSubmitRegistrationsRequestSerializer
+        elif payload_tag == 'Structures':
+            serializers = import_module('fiesta.core.serializers.structure')
+            return serializers.StructureSerializer
         else:
-            if payload_tag not in ['SubmitStructureRequest', 'Structures']:
-                return ParseError('Parsing a %s payload not implemented yet' % payload_tag) 
-            structure = import_module(os.path.join('fiesta.structure'))
-            if payload_tag == 'SubmitStructureRequest':
-                return structure.RegistryInterfaceSubmitStructureRequest
-            elif payload_tag == 'Structures':
-                return structure.Structure
+            return ParseError('Parsing a %s payload not implemented yet' % payload_tag) 
 
     def get_stream_from_location(self, location):
         cfg = self.create_configuration(location)
@@ -90,7 +87,20 @@ class XMLParser(BaseParser):
         return source
 
     def get(self, location):
-        stream = self.get_stream_from_location(location)
+        try:
+            stream = self.get_stream_from_location(location)
+        except requests.exceptions.MissingSchema:
+            # Load data from local file
+            # json files must be opened in text mode, all others in binary as
+            # they may be zip files or xml.
+            try:
+                if location.endswith('.json'):
+                    mode_str = 'r'
+                else:
+                    mode_str = 'rb'
+                stream = open(location, mode_str)
+            except FileNotFoundError:
+                stream = location 
         return self.parse(stream)
 
     def create_configuration(self, location):

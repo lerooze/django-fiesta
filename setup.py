@@ -3,22 +3,27 @@
 Installation script:
 
 To release a new version to PyPi:
-- Ensure the version is correctly set in fiesta.__init__.py
+- Ensure the version is correctly set in fiesta.__version__.py
 - Run: make release
 """
 import os
 import re
 import sys
 
+from codecs import open
+
 from setuptools import find_packages, setup
 
-PROJECT_DIR = os.path.dirname(__file__)
 
-sys.path.append(os.path.join(PROJECT_DIR, 'src'))
-from fiesta import get_version  # noqa isort:skip
+local_here = os.path.dirname(__file__)
+abs_here = os.path.abspath(local_here)
+sys.path.append(os.path.join(local_here, 'src'))
 
 install_requires = [
     'django>=2.2,<2.3',
+    # for core functionality
+    'django-oscar',
+    # for REST web services
     'djangorestframework>=3.9',
     # lxml for xml parsing, schema validation and xml generation
     'lxml',
@@ -35,10 +40,10 @@ install_requires = [
 ]
 
 docs_requires = [
-    # 'Sphinx==2.0.1',
-    # 'sphinxcontrib-napoleon==0.7',
-    # 'sphinx_rtd_theme==0.4.3',
-    # 'sphinx-issues==1.2.0',
+    'Sphinx==2.0.1',
+    'sphinxcontrib-napoleon==0.7',
+    'sphinx_rtd_theme==0.4.3',
+    'sphinx-issues==1.2.0',
 ]
 
 # sorl_thumbnail_version = 'sorl-thumbnail>=12.4.1,<12.5'
@@ -46,33 +51,52 @@ docs_requires = [
 
 test_requires = [
     # 'WebTest>=2.0,<2.1',
+
     # 'coverage>=4.5,<4.6',
+    'coverage>=4.5',
+
     # 'django-webtest==1.9.4',
-    # 'py>=1.4.31',
     # 'psycopg2>=2.7,<2.8',
+
     # 'pytest>=4.0,<4.5',
-    # 'pytest-cov==2.6.1',
-    # 'pytest-django==3.4.8',
-    # 'pytest-xdist>=1.25,<1.28',
-    # 'tox>=3.0,<3.9',
+    'pytest>=4.0',
+    'pytest-cov==2.6.1',
+    'pytest-django==3.4.8',
+    'pytest-spec',
+    'pdbpp',
+
+    #'pytest-xdist>=1.25,<1.28',
+    'pytest-xdist>=1.25',
+
+    #'tox>=3.0,<3.9',
+    'tox>=3.0',
+
+
     # sorl_thumbnail_version,
     # easy_thumbnails_version,
 ]
 
-with open(os.path.join(PROJECT_DIR, 'README.rst')) as fh:
-    long_description = re.sub(
+about = {}
+with open(os.path.join(abs_here, 'src', 'fiesta', '__version__.py'), 'r', 'utf-8') as f:
+    exec(f.read(), about)
+
+with open(os.path.join(abs_here, 'README.rst')) as fh:
+    readme = re.sub(
         '^.. start-no-pypi.*^.. end-no-pypi', '', fh.read(), flags=re.M | re.S)
 
+# with open('README.md', 'r', 'utf-8') as f:
+#     readme = f.read()
+# with open('HISTORY.md', 'r', 'utf-8') as f:
+
+    # history = f.read()
 setup(
-    name='django-fiesta',
-    version=get_version(),
-    url='https://github.com/lerooze/django-fiesta',
-    author="Antonios Loumiotis",
-    author_email="al459@columbia",
-    description="A SDMX framework for Django",
-    long_description=long_description,
-    keywords="SDMX, Django",
-    license='BSD',
+    name=about['__title__'],
+    version=about['__version__'],
+    description=about['__description__'],
+    long_description=readme,
+    author=about['__author__'],
+    author_email=about['__author_email__'],
+    url=about['__url__'],
     package_dir={'': 'src'},
     packages=find_packages('src'),
     include_package_data=True,
@@ -100,23 +124,3 @@ setup(
         'Topic :: Scientific/Engineering :: Information Analysis'
     ]
 )
-
-# # Show contributing instructions if being installed in 'develop' mode
-# if len(sys.argv) > 1 and sys.argv[1] == 'develop':
-#     docs_url = 'https://django-fiesta.readthedocs.io/en/latest/internals/contributing/index.html'
-#     mailing_list = 'django-fiesta@googlegroups.com'
-#     mailing_list_url = 'https://groups.google.com/forum/?fromgroups#!forum/django-fiesta'
-#     twitter_url = 'https://twitter.com/django_fiesta'
-#     msg = (
-#         "You're installing Fiesta in 'develop' mode so I presume you're thinking\n"
-#         "of contributing:\n\n"
-#         "(a) That's brilliant - thank you for your time\n"
-#         "(b) If you have any questions, please use the mailing list:\n    %s\n"
-#         "    %s\n"
-#         "(c) There are more detailed contributing guidelines that you should "
-#         "have a look at:\n    %s\n"
-#         "(d) Consider following @django_fiesta on Twitter to stay up-to-date\n"
-#         "    %s\n\nHappy hacking!") % (mailing_list, mailing_list_url,
-#                                        docs_url, twitter_url)
-#     line = '=' * 82
-#     print(("\n%s\n%s\n%s" % (line, msg, line)))

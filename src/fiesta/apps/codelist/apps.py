@@ -1,4 +1,6 @@
-from fiesta.core.application import BaseFiestaConfig
+# apps.py
+
+from ...core.application import BaseFiestaConfig
 
 class CodelistConfig(BaseFiestaConfig):
     label = 'codelist'

@@ -1,13 +1,42 @@
+# views.py
 
 from django.apps import apps
 from django.core.files.base import ContentFile
-from fiesta.core import constants
 from rest_framework import status 
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from fiesta.dataclasses import StructureDataclass
-from fiesta.core.dataclasses.options import (
+
+from ..core import constants
+from ..core.serializers.options import (
     ProcessContextOptions, RESTfulQueryContextOptions)
+from ..core.serializers.structure import StructureSerializer
+
+class SubmitRegistrationsRequestView(APIView):
+
+    def post(self, request, format=None):
+        log_model = apps.get_model('registry', 'acquisitionlog')
+        log = log_model.objects.create(
+            user=request.user,
+            channel='Registry',
+            progress='Submitted',
+        )
+        log.update_progress('Negotiating Content')
+        request.body
+        data = request.data
+        log.update_progress('Processing')
+        context = ProcessContextOptions(request, log)
+        data.process(context=context)
+        log.update_progress('Negotiating Media')
+        outdata = data.to_response()
+        if data._context.result.submitted_structure.maintainable_object.ref.agency_id == 'MAIN':
+            response_status = status.HTTP_400_BAD_REQUEST
+        else:
+            response_status = status.HTTP_200_OK
+        acquisition_file = ContentFile(request.stream)
+        log.acquisition_file.save(f'Ref_{data.m_header.id}.xml',
+                                              acquisition_file)
+        log.update_progress('Finished')
+        return Response(outdata, status=response_status)
 
 class SubmitStructureRequestView(APIView):
     
@@ -46,7 +75,7 @@ class SDMXRESTfulStructureView(APIView):
             channel='RESTful_query',
             progress='Submitted',
         )
-        query_model = apps.get_model('registry', 'RESTful_query')
+        query_model = apps.get_model('registry', 'restfulquery')
         query_params = request.query_params
         for key, value in query_params:
             if key not in ['detail', 'references']:
@@ -73,7 +102,7 @@ class SDMXRESTfulStructureView(APIView):
         )
         log.update_progress('Processing')
         context = RESTfulQueryContextOptions(query)
-        data = StructureDataclass().retrieve_restful(context)
+        data = StructureSerializer().retrieve_restful(context)
         data._query = query 
         log.update_progress('Finished')
         return Response(data, status=status.HTTP_200_OK)
