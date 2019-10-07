@@ -23,6 +23,7 @@ class AbstractOrganisationScheme(common.MaintainableArtefact):
         abstract = True
 
 class AbstractOrganisation(common.ManyToManyItemWithParent):
+    content_constraint = models.ManyToManyField('registry.ContentConstraint')
     wrappers = models.ManyToManyField('OrganisationScheme')
 
     class Meta(common.ManyToManyItemWithParent.Meta):

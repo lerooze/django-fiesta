@@ -11,16 +11,12 @@ class SetUpMixin:
 
     def setUp(self):
         self.UserModel = get_user_model() 
-        ecb_user, _ = self.UserModel.objects.get_or_create(username='neosdmx.ecb@gmail.com',
-                                             first_name='NeoSDMX',
-                                             last_name='ECB',
-                                             email='neosdmx.ecb@gmail.com',
-                                             password='pass')
-        sdmx_user, _ = self.UserModel.objects.get_or_create(username='neosdmx.sdmx@gmail.com',
-                                             first_name='NeoSDMX',
-                                             last_name='SDMX',
-                                             email='neosdmx.sdmx@gmail.com',
-                                             password='pass')
+        ecb_user, _ = self.UserModel.objects.get_or_create(
+            username='neosdmx.ecb@gmail.com', first_name='NeoSDMX',
+            last_name='ECB', email='neosdmx.ecb@gmail.com', password='pass')
+        sdmx_user, _ = self.UserModel.objects.get_or_create(
+            username='neosdmx.sdmx@gmail.com', first_name='NeoSDMX',
+            last_name='SDMX', email='neosdmx.sdmx@gmail.com', password='pass')
         sdmx, _ = models.Organisation.objects.get_or_create(object_id='SDMX')
         ecb, _ = models.Organisation.objects.get_or_create(object_id='ECB')
         models.Contact.objects.get_or_create(user=sdmx_user, organisation=sdmx)

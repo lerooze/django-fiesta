@@ -1,6 +1,7 @@
 # structure.py
 
 import functools
+import import_module
 import lxml 
 
 from dataclasses import asdict
@@ -28,16 +29,43 @@ class CommonSerializer(Serializer):
     class Meta:
         namespace_key = 'common'
 
+class ReferencePeriodSerializer(CommonSerializer):
+    start_time: datetime = field()
+    end_time: datetime = field()
+
+    class Meta:
+        package = 'common'
+        model_name = 'referenceperiod'
+        namespace_key = 'common'
+
+    def process_premake(self):
+        obj, _ = self._meta.model.objects.get_or_create(
+            start_time = self.start_time,
+            end_time = self.end_time
+        )
+        return obj
+
+
 class RegistrySerializer(Serializer):
 
     class Meta:
         namespace_key = 'registry'
 
+class BaseStructureSerializer(Serializer):
+
+    class Meta:
+        namespace_key = 'structure'
+
 class StringSerializer(Serializer):
     text: str = field(is_text=True)
 
-class TextSerializer(StringSerializer):
+    class Meta:
+        namespace_key = 'common'
 
+class ValueSerializer(StringSerializer):
+    cascade_values: bool = field(is_attribute=True, default=False)
+
+class TextSerializer(StringSerializer):
     lang: str = field(is_attribute=True, namespace_key='xml', default='en')
 
     class Meta:
@@ -101,6 +129,9 @@ class RefSerializer(Serializer):
         elif object_name == 'dataflow':
             self.cls = 'Dataflow'
             self.package = 'datastructure'
+        elif object_name == 'attachmentconstraint':
+            self.cls = 'AttachmentConstraint'
+            self.package = 'registry'
         elif object_name == 'dimension':
             if not self.object_id:
                 self.object_id = self._obj 
@@ -545,7 +576,7 @@ class MaintainableSerializer(VersionableSerializer):
             for parent in cls._meta.get_parents():
                 qrs[parent] = parent.make_related_query(cls, context)
 
-    def _to_element_as_stub(self, class_meta, detail, resource):
+    def as_stub(self, class_meta, detail, resource):
         """Returns True if element should be rendered as stub."""
         return (
             (detail == 'allstubs') 
@@ -691,7 +722,7 @@ class StructuresItemsSerializer(Serializer):
             setattr(self, f.name, maintainable_type.generate_many(query))
 
 class BaseItemSerializer(NameableSerializer):
-    parent: ReferenceSerializer = field(namespace_key='common', forward=True)
+    parent: ReferenceSerializer = field(namespace_key='common')
 
 class ItemSerializer(BaseItemSerializer):
 
@@ -790,15 +821,12 @@ class DataConsumerSchemeSerializer(OrganisationSchemeSerializer):
 class DataProviderSchemeSerializer(OrganisationSchemeSerializer):
     data_provider: Iterable[DataProviderSerializer] = field(namespace_key='structure') 
 
-    @classmethod
-    def make_root_query(cls, context):
-        root = super().make_root_query(context)
-        root_args = dict(*root.children)
-        resource_id = root_args.get('object_id')
-        if resource_id and resource_id != 'DATA_PROVIDERS':
-            raise ParseError('The resourceID of a dataproviderscheme query must be equal to DATA_PROVIDERS if set')
-        else: root = root & Q(object_id='DATA_PROVIDERS')
-        return root
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationscheme'
+        namespace_key = 'structure'
+        structures_field_name = 'organisation_schemes'
+        parent_names = ['ProvisionAgreementSerializer', 'ContentConstraintSerializer']
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -808,8 +836,20 @@ class DataProviderSchemeSerializer(OrganisationSchemeSerializer):
         rel_qry = qrs[related_cls]
         rel_objects = related_cls._meta.model.objects
         if related_cls._meta.object_name == 'ProvisionAgreementSerializer':
-            qlist.append(Q(organisation__provision_agreement__in=rel_objects.filter(rel_qry)))
+            qlist.append(Q(organisation__provisionagreement__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'ContentConstraintSerializer':
+            qlist.append(Q(organisation__contentconstraint__in=rel_objects.filter(rel_qry)))
         return functools.reduce(lambda x, y: x | y, qlist)
+
+    @classmethod
+    def make_root_query(cls, context):
+        root = super().make_root_query(context)
+        root_args = dict(*root.children)
+        resource_id = root_args.get('object_id')
+        if resource_id and resource_id != 'DATA_PROVIDERS':
+            raise ParseError('The resourceID of a dataproviderscheme query must be equal to DATA_PROVIDERS if set')
+        else: root = root & Q(object_id='DATA_PROVIDERS')
+        return root
 
 class OrganisationUnitSchemeSerializer(OrganisationSchemeSerializer):
     organisation_unit: Iterable[OrganisationUnitSerializer] = field(namespace_key='structure') 
@@ -839,7 +879,7 @@ class CodelistSerializer(ItemSchemeSerializer):
         model_name = 'codelist'
         namespace_key = 'structure'
         structures_field_name = 'codelists'
-        parents_names = ['ConceptSchemeSerializer', 'DataStructureSerializer']
+        parent_names = ['ConceptSchemeSerializer', 'DataStructureSerializer']
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -886,9 +926,9 @@ class FormatSerializer(Serializer):
         return obj
 
 class RepresentationSerializer(Serializer):
-    text_format: FormatSerializer = field(forward=True)
-    enumeration: ReferenceSerializer = field(forward=True)
-    enumeration_format: FormatSerializer = field(forward=True)
+    text_format: FormatSerializer = field()
+    enumeration: ReferenceSerializer = field()
+    enumeration_format: FormatSerializer = field()
 
     class Meta:
         app_name ='common' 
@@ -953,7 +993,7 @@ class ConceptSchemeSerializer(ItemSchemeSerializer):
         model_name = 'conceptscheme'
         namespace_key = 'structure'
         children_names = 'CodelistSerializer'
-        parents_names = ['DataStructureSerializer']
+        parent_names = ['DataStructureSerializer']
         structures_field_name = 'concepts'
 
     @classmethod
@@ -1155,8 +1195,7 @@ class DimensionListSerializer(ComponentListSerializer):
 class GroupSerializer(ComponentListSerializer):
 
     group_dimension: Iterable[GroupDimensionSerializer] = field()
-    #TODO
-    #attachment_constraint: AttachmentConstraint = field()
+    attachment_constraint: ReferenceSerializer = field()
 
     class Meta:
         app_name = 'datastructure'
@@ -1211,8 +1250,36 @@ class DataStructureSerializer(MaintainableSerializer):
         model_name = 'datastructure'
         namespace_key = 'structure'
         children_names = ['ConceptSchemeSerializer, CodelistSerializer']
-        parents_names = 'DataflowSerializer'
+        parent_names = ['DataflowSerializer', 'AttachmentConstraintSerializer']
         structures_field_name = 'datastructures'
+
+    def expose_group(self):
+        result_list, result_dict = [], {}
+        components = self.data_structure_components
+        groups = components.group
+        if groups: result_list = list(groups.copy())
+        result_dict = {group.object_id: group for group in result_list}
+        return result_list, result_dict
+
+    def expose_components(self, component_name, component_subname):
+        result_list, result_dict = [], {}
+        components = getattr(self.data_structure_components, component_name)
+        if components: result_list = list(getattr(components, component_subname).copy())
+        result_dict = {comp.object_id: comp for comp in result_list}
+        return result_list, result_dict
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        self.dimension_list, self.dimension_dict = self.expose_components('dimension_list', 'dimension')
+        self.group_list, self.group_dict = self.expose_group()
+        self.measure_list, self.measure_dict = self.expose_components('measure_list', 'primary_measure')
+        self.attribute_list, self.attribute_dict = self.expose_components('attribute_list', 'attribute')
+        if not self._instance: return
+        serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
+        item_set = self._instance.content_constraint
+        self.content_constraint_list = [serializers.ContentConstraintSerializer(item) for item in item_set]
+        item_set = self._instance.attachment_constraint
+        self.attachment_constraint_list = [AttachmentConstraintSerializer(item) for item in item_set]
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -1239,11 +1306,14 @@ class DataStructureSerializer(MaintainableSerializer):
             qlist.append(Q(attribute_list__attribute__concept_role__wrapper__in=rel_objects.filter(rel_qry)))
         elif related_cls._meta.object_name == 'DataflowSerializer':
             qlist.append(Q(dataflow__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'AttachmentConstraintSerializer':
+            qlist.append(Q(attachment_constraint__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'ContentConstraintSerializer':
+            qlist.append(Q(content_constraint__in=rel_objects.filter(rel_qry)))
         return functools.reduce(lambda x, y: x | y, qlist)
 
 class DataStructuresSerializer(StructuresItemsSerializer):
     data_structure: Iterable[DataStructureSerializer] = field()
-
 
 class DataflowSerializer(MaintainableSerializer):
     structure: ReferenceSerializer = field()
@@ -1253,7 +1323,15 @@ class DataflowSerializer(MaintainableSerializer):
         model_name = 'dataflow'
         namespace_key = 'structure'
         children_names = 'DataStructureSerializer'
+        parent_names = 'ContentConstraintSerializer'
         structures_field_name = 'dataflows'
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        if not self._instance: return
+        serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
+        item_set = self._instance.content_constraint
+        self.content_constraint_list = [serializers.ContentConstraintSerializer(item) for item in item_set]
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -1266,6 +1344,8 @@ class DataflowSerializer(MaintainableSerializer):
             qlist.append(Q(datastructure__in=rel_objects.filter(rel_qry)))
         elif related_cls._meta.object_name == 'ProvisionAgreementSerializer':
             qlist.append(Q(provision_agreement__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'ContentConstraintSerializer':
+            qlist.append(Q(content_constraint__in=rel_objects.filter(rel_qry)))
         return functools.reduce(lambda x, y: x | y, qlist)
 
 class DataflowsSerializer(StructuresItemsSerializer):
@@ -1280,7 +1360,15 @@ class ProvisionAgreementSerializer(MaintainableSerializer):
         model_name = 'provisionagreement'
         namespace_key = 'structure'
         children_names = ['DataflowSerializer', 'DataProviderSchemeSerializer']
+        parent_names = 'ContentConstraintSerializer'
         structures_field_name = 'provision_agreements'
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        if not self._instance: return
+        serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
+        item_set = self._instance.content_constraint
+        self.content_constraint_list = [serializers.ContentConstraintSerializer(item) for item in item_set]
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -1293,10 +1381,279 @@ class ProvisionAgreementSerializer(MaintainableSerializer):
             qlist.append(Q(dataflow__in=rel_objects.filter(rel_qry)))
         elif related_cls._meta.object_name == 'DataProviderSchemeSerializer':
             qlist.append(Q(data_provider__wrapper__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'ContentConstraintSerializer':
+            qlist.append(Q(content_constraint__in=rel_objects.filter(rel_qry)))
         return functools.reduce(lambda x, y: x | y, qlist)
 
 class ProvisionAgreementsSerializer(StructuresItemsSerializer):
-    provision_agreement: ProvisionAgreementSerializer = field()
+    provision_agreement: Iterable[ProvisionAgreementSerializer] = field()
+
+class AttachmentConstraintAttachmentSerializer(BaseStructureSerializer):
+    # Attachment constraints not attached to structural metadata (DSD) 
+    # are of no use since groups and their association to attachment
+    # constraints must be defined in structural metadata (DSD) and be given a unique identifier,
+    # thus should be attached to datastructure 
+
+    data_structure: Iterable[ReferenceSerializer] = field(related_name='datastructure_set')
+
+    def process_postvalidate(self, obj): 
+        super().process_postvalidate(obj)
+        self.data_structure = list(self.data_structure)
+        dsd = self.data_structure[0]
+        self._context.dsd = self.get_from_reference(dsd).unroll()
+        
+    def process_postmake(self, obj):
+        obj = super().postmake(obj)
+        for attachment in ['data_structure']:
+            if getattr(self, attachment):
+                setattr(self, attachment, list(getattr(self, attachment)))
+                for item in getattr(self, attachment):
+                    item._obj.attachment_constraint.add(obj)
+        return obj
+
+class ContentConstraintAttachmentSerializer(BaseStructureSerializer):
+    #TODO Most likely will never implement content constraints attached to DataSet and SimpleDataSource since I don't see envision a demand for them
+    #TODO Most likely will never implement content constraints attached to Queryable artefacts since SOAP web service is not implemented
+
+    data_provider: ReferenceSerializer = field()
+    data_structure = Iterable[ReferenceSerializer] = field()
+    dataflow = Iterable[ReferenceSerializer] = field()
+    provision_agreement = Iterable[ReferenceSerializer] = field()
+
+    class Meta:
+        namespace = 'structure'
+
+    def process_postmake(self, obj):
+        obj = super().postmake(obj)
+        if self.data_provider:
+            self.m_data_provider.add(obj)
+        for attachment in ['data_structure', 'dataflow', 'provision_agreement']:
+            if getattr(self, attachment):
+                setattr(self, attachment, list(getattr(self, attachment)))
+                for item in getattr(self, attachment):
+                    item._obj.content_constraint.add(obj)
+        return obj
+
+class BaseSubKeySerializer(Serializer):
+    value: StringSerializer = field()
+
+class SubKeySerializer(BaseSubKeySerializer):
+    component_id: str = field(is_attribute=True, localname='id')
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'subkey'
+        namespace_key = 'common'
+
+    def process_postmake(self):
+        return self._meta.model.objects.create(
+            key=self._wrapper._obj,
+            component_id=self.component_id,
+            value=self.value.text
+        )
+
+class CubeRegionKeyValueSerializer(BaseSubKeySerializer):
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'cuberegionkeyvalue'
+        namespace_key = 'common'
+
+    def process_postmake(self):
+        return self._meta.model.objects.create(
+            key=self._wrapper._obj,
+            value=self.value.text
+        )
+
+class KeySerializer(BaseStructureSerializer):
+    sub_key: Iterable[SubKeySerializer] = field()
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'key'
+        namespace_key = 'structure'
+
+    def process_premake(self):
+        return self._meta.model.objects.create(
+            key_set=self._wrapper._obj,
+        )
+
+class TimePeriodSerializer(StringSerializer):
+    is_inclusive: bool = field(is_attribute=True, default=True)
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'timeperiod'
+        namespace_key = 'structure'
+
+    def process_premake(self):
+        obj, _ = self._meta.model.objects.get_or_create(
+            time_period=self.text,
+            is_inclusive=self.inclusive
+        )
+        return obj
+
+class TimeRangeSerializer(CommonSerializer):
+    before_period: TimePeriodSerializer = field() 
+    after_period: TimePeriodSerializer = field()
+    start_period: TimePeriodSerializer = field()
+    end_period: TimePeriodSerializer = field()
+
+    def process_postmake(self, obj):
+        before_period = self.m_before_period if self.before_period else None 
+        after_period = self.m_after_period if self.after_period else None 
+        start_period = self.m_start_period if self.start_period else None 
+        end_period = self.m_end_period if self.end_period else None 
+        obj, _ = self._meta.model.objects.get_or_create(
+            cube_region_key=self._wrapper._obj,
+            before_period=before_period,
+            after_period=after_period,
+            start_period=start_period,
+            end_period=end_period,
+        )
+        return obj
+
+class CubeRegionKeySerializer(CommonSerializer):
+    component_id: str = field(is_attribute=True, localname='id')
+    value: Iterable[ValueSerializer] = field()
+    time_range: TimeRangeSerializer = field()
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'cuberegionkey'
+        namespace_key = 'common'
+
+    def process_postmake(self):
+        return self._meta.model.objects.create(
+            cube_region=self._wrapper._obj,
+            component_id=self.component_id,
+        )
+
+class DataKeySetSerializer(BaseStructureSerializer):
+    key: Iterable[KeySerializer] = field()
+    is_included: bool = field(is_attribute=True)
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'keyset'
+        namespace_key = 'structure'
+
+    def process_premake(self):
+        if self._wrapper._meta.object_name == 'AttachmentConstraintSerializer':
+            return self._meta.model.objects.create(
+                attachment_constraint=self._wrapper._obj,
+                is_included=self.is_included
+            )
+        else:
+            return self._meta.model.objects.create(
+                content_constraint=self._wrapper._obj,
+                is_included=self.is_included
+            )
+
+class CubeRegionSerializer(CommonSerializer):
+    key_value: Iterable[CubeRegionKeySerializer] = field() 
+    attribute: Iterable[CubeRegionKeySerializer] = field() 
+    include: bool = field(is_attribute=True, default=True)
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'cuberegion'
+        namespace_key = 'common'
+
+    def process_premake(self):
+        return self._meta.model.objects.create(
+            content_constraint=self._wrapper._obj,
+            include=self.include
+        )
+
+class AttachmentConstraintSerializer(MaintainableSerializer):
+    constraint_attachment: AttachmentConstraintAttachmentSerializer = field()
+    data_key_set: Iterable[DataKeySetSerializer] = field()
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'attachmentconstraint'
+        namespace_key = 'structure'
+        children_names = ['DataStructureSerializer']
+        structures_field_name = 'constraints'
+
+    @classmethod
+    def make_related_query(cls, related_cls, context):
+        qlist = []
+        qrs = context.queries
+        qlist.append(qrs[cls])
+        rel_qry = qrs[related_cls]
+        rel_objects = related_cls._meta.model.objects
+        if related_cls._meta.object_name == 'DataStructureSerializer':
+            qlist.append(Q(datastructure__in=rel_objects.filter(rel_qry)))
+        return functools.reduce(lambda x, y: x | y, qlist)
+
+class ReleaseCalendarSerializer(BaseStructureSerializer):
+    periodicity: StringSerializer = field(is_text=True)
+    offset: StringSerializer = field(is_text=True)
+    tolerance: StringSerializer = field(is_text=True)
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'releasecalendar'
+        namespace_key = 'structure'
+
+    def process_premake(self):
+        obj, _ = self._meta.model.objects.get_or_create(
+            periodicity=self.periodicity,
+            offset=self.offset,
+            tolerance=self.tolerance
+        )
+        return obj
+
+
+class ContentConstraintSerializer(MaintainableSerializer):
+    constraint_attachment: ContentConstraintAttachmentSerializer = field()
+    data_key_set: Iterable[DataKeySetSerializer] = field()
+    cube_region: Iterable[CubeRegionSerializer] = field() 
+    release_calendar: ReleaseCalendarSerializer = field()
+    reference_period: ReferencePeriodSerializer = field()
+    tipe: str = field(localname='type', is_attribute=True, default='Actual')
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'contentconstraint'
+        namespace_key = 'structure'
+        children_names = ['DataProviderSchemeSerializer',
+                          'DataStructureSerializer', 'DataflowSerializer',
+                          'ProvisionAgreementsSerializer']
+        structures_field_name = 'constraints'
+
+    def process_postmake(self, obj):
+        obj = super().process_postmake(obj)
+        if self.release_calendar:
+            obj.release_calendar = self.m_release_calendar
+        if self.reference_period:
+            obj.reference_period = self.m_reference_period
+        obj.tipe = self.tipe
+        return obj
+
+    @classmethod
+    def make_related_query(cls, related_cls, context):
+        qlist = []
+        qrs = context.queries
+        qlist.append(qrs[cls])
+        rel_qry = qrs[related_cls]
+        rel_objects = related_cls._meta.model.objects
+        if related_cls._meta.object_name == 'DataStructureSerializer':
+            qlist.append(Q(datastructure__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'DataflowSerializer':
+            qlist.append(Q(dataflow__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'ProvisionAgreementSerializer':
+            qlist.append(Q(provisionagreement__in=rel_objects.filter(rel_qry)))
+        elif related_cls._meta.object_name == 'DataProviderSchemeSerializer':
+            qlist.append(Q(organisation__wrappers__in=rel_objects.filter(rel_qry)))
+        return functools.reduce(lambda x, y: x | y, qlist)
+
+class ConstraintsSerializer(StructuresItemsSerializer):
+    attachment_constraint: Iterable[AttachmentConstraintSerializer] = field()
+    content_constraint: Iterable[ContentConstraintSerializer] = field()
+
 
 class StructuresSerializer(Serializer):
     organisation_schemes: OrganisationSchemesSerializer = field()
@@ -1312,12 +1669,39 @@ class StructuresSerializer(Serializer):
     # structure_sets: StructureSetsSerializer = field(namespace_key='registry')
     # reporting_taxonomies: ReportingTaxonomiesSerializer = field(namespace_key='registry')
     # processes: ProcessesSerializer = field(namespace_key='registry')
-    # constraints: ConstraintsSerializer = field(namespace_key='registry')
+    constraints: ConstraintsSerializer = field(namespace_key='registry')
     provision_agreements: ProvisionAgreementsSerializer = field(namespace_key='registry')
 
     class Meta:
         namespace_key = 'structure'
 
+    def expose_maintainables(self, field_name, subfield_name):
+        result_list = []
+        field = getattr(self, field_name)
+        if field: subfield = getattr(field, subfield_name)
+        if subfield:  result_list = list(subfield.copy())
+        result_dict = {}
+        for m in result_list:
+            version = '' if m.version == '1.0' else m.version
+            result_dict[f'{m.agency_id}.{m.object_id}.{version}'] = m
+        return result_list, result_dict
+
+    def expose_maintainables_asdict(self, field_name, subfield_name):
+        value = []
+        field = getattr(self, field_name)
+        if field: subfield = getattr(field, subfield_name)
+        if subfield:  value = list(subfield.copy())
+        return value
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        # Expose maintainable lists higher up as lists and as dict
+        for fld in self._meta.fields:
+            for subfld in field._meta.fields:
+                maintainable_list, maintainable_dict = self.expose(fld.name, subfld.name)
+                setattr(self, f'{subfld.name}_list', maintainable_list)
+                setattr(self, f'{subfld.name}_dict', maintainable_dict)
+        
     def retrieve_restful(self, context):
         for f in self._meta.fields:
             if f.name not in context.structures_field_names: continue
@@ -1603,7 +1987,6 @@ class NotifyRegistryEventSerializer(RegistrySerializer):
     structural_event: StructuralEventSerializer = field()
     # registration_event: RegistrationEvent = field()
 
-
 class RegistryInterfaceSubmitStructureRequestSerializer(BaseSDMXMessageSerializer):
     submit_structure_request: SubmitStructureRequestSerializer = field()
 
@@ -1649,7 +2032,6 @@ class RegistrationRequestSerializer(RegistrySerializer):
         app_name ='registry'
         model_name = 'submitstructurerequest'
         namespace_key = 'registry'
-
 
 class SubmitRegistrationsRequestSerializer(RegistrySerializer):
     registration_request: Iterable[RegistrationRequestSerializer] = field()

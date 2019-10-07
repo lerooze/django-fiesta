@@ -33,7 +33,9 @@ class ClassOptions:
     namespace_key: str
         The namespace_key of the related element
     children_names: Tuple[str]
-        Names of Maintainable dataclasses that are its children as defined in the SDMX model
+        Names of Maintainable dataclasses that are its children as defined in the SDMX web services guidelines
+    parents_names: Tuple[str]
+        Names of Maintainable dataclasses that are its parents as defined in the SDMX web services guidelines
 
     Attribute Fields
     ----------------
@@ -59,10 +61,6 @@ class ClassOptions:
         The nsmap needed to generate the lxml element
     tag: QName
         The tag of the related element
-    children: Tuple[Dataclass]
-        Maintainable dataclasses that are its children as defined in the SDMX model
-    parents: Tuple[Dataclass]
-        Maintainable dataclasses that are its parents
     underscore_name:
         Underscore converted model name
 
@@ -82,8 +80,6 @@ class ClassOptions:
     nsmap: dict = field(init=False)
     tag: QName = field(init=False)
     non_attr_fields: Tuple[Field] = field(init=False)
-    # children: Tuple[object] = field(init=False)
-    # parents: List[object] = field(init=False)
     underscore_name: str = field(init=False)
 
     def contribute_to_class(self, cls, name):
@@ -99,8 +95,6 @@ class ClassOptions:
         self.nsmap = self.get_nsmap()
         self.tag = self.get_tag()
         self.non_attr_fields = self.get_non_attr_fields()
-        # self.children = self.get_children()
-        # self.set_parents()
         self.underscore_name = underscore(self.object_name)
     
         # Store option values that are derived from other options if not provided
@@ -115,7 +109,6 @@ class ClassOptions:
         # new_meta.class_wrapper = CLASS2WRAPPER.get(new_meta.class_name)
         # new_meta.model = cls.get_model(new_meta)
         # new_meta.container_name = cls.get_container_name(new_meta)
-        # cls.set_parents(new_meta.children)
         # cls._meta = new_meta
 
     def get_children(self):
@@ -127,7 +120,7 @@ class ClassOptions:
     
     def get_parents(self):
         if isinstance(self.parent_names, str):
-            self.children_names = [self.parent_names]
+            self.parent_names = [self.parent_names]
         module = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
         return tuple(getattr(module, parent_name)
                      for parent_name in self.parent_names)
@@ -136,14 +129,6 @@ class ClassOptions:
         for child in children:
             if underscore(child._meta.object_name).startswith(field_name):
                 return child
-
-    def set_parents(self):
-        try:
-            self.parents
-        except AttributeError:
-            self.parents = []
-        for child in self.children:
-            child._meta.parents.append(self.cls)
 
     def get_resources(self):
         return constants.CLASS2RESOURCES.get(self.object_name)  
@@ -233,10 +218,7 @@ class ClassOptions:
              not f.metadata.FIESTA.is_text)
         ) 
 
-    # def set_parents(cls, children):
-    #     for child_cls in children:
-    #         child_cls._meta.parent.append(cls)
-    #
+    
     # def get_container_name(cls, meta):
     #     if meta.container_name: return meta.container_name
     #     return f"{meta.class_name.split('Dataclass')[0].lower()}s"
@@ -398,6 +380,9 @@ class ProcessContextOptions:
         The default action to take on processing the artefacts
     external_dependencies: str
         The default external_dependencies when processing the artefacts
+    dsd: DataStructureSerializer
+        The DataStructureSerializer instance set when processing an
+        AttachmentConstraintSerializer
 
     ----------------
     """
@@ -407,6 +392,7 @@ class ProcessContextOptions:
     result: object = field(init=False)
     action: str = field(init=False)
     external_dependencies: bool = field(init=False)
+    dsd: object = field(init=False)
     
     def get_or_add_result(self, submitted_structure):
         r = self.results

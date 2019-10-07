@@ -6,6 +6,11 @@ ORGANISATION_TYPES = (
     ('OrganisationUnit', 'OranisationUnit'),
 )
 
+CONTENT_CONSTRAINT_TYPE_CODE = (
+    ('Actual', 'Actual'),
+    ('Allowed', 'Allowed'),
+)
+
 DIMENSION_TYPES = (
     ("dimension", "dimension"),
     ("measureDimension", "measureDimension")
@@ -330,7 +335,10 @@ QUERY_PARAMS = {
     'structure': {
         'detail': ['full', 'allstubs', 'referencestubs'],
         'references': ['none', 'parents', 'parentsandsiblings', 'children',
-                       'descendants', 'all'] + RESOURCES 
+                       'descendants', 'all'] + RESOURCES
+    },
+    'schema': {
+        'dimensionAtObservation': ['TIME_PERIOD', 'AllDimensions', 'MeasureDimension']
     }
 }
 

@@ -100,7 +100,7 @@ FIESTA_2405_PARENT_NOT_IN_SCHEME = CommonStatusMessage(
     2405,
     _('Parent organisation does not belong to the child organisation scheme and will be ignored')
 )
-FIESTA_2406_AGENCY_NOT_REGISTERED = CommonStatusMessage(
+FIESTA_2406_MAINTAINABLE_ARTEFACT_INEXISTENT = CommonStatusMessage(
     2406,
     _("Maintainable artefact does not exist")
 )

@@ -1,17 +1,19 @@
-"""
-Provides XML parsing support.
-"""
-from importlib import import_module
-from zipfile import ZipFile, is_zipfile
+# parser.py
 
+import inspect
+import requests
+
+from importlib import import_module
+from lxml import etree # TODO work on xml security
 from rest_framework.exceptions import ParseError, UnsupportedMediaType
 from rest_framework.parsers import BaseParser
 from rest_framework.response import Response
 from tempfile import SpooledTemporaryFile
-import requests
+from typing import Iterable
+from zipfile import ZipFile, is_zipfile
 
-# TODO work on xml security
-from lxml import etree
+from ...settings import api_settings
+from ...utils.coders import decode 
 from ...utils.schema import Schema
 
 class XMLParser(BaseParser):
@@ -19,6 +21,9 @@ class XMLParser(BaseParser):
     XML parser.
     """
     media_type = 'application/xml'
+
+    def __init__(self, *args, **kwargs):
+        self.serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
 
     def get_root(self, stream):
         if is_zipfile(stream):
@@ -55,20 +60,17 @@ class XMLParser(BaseParser):
             if not schema(root):
                 errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]
                 raise ParseError(errors)
-        serializer = self.get_serializer(root)
-        return serializer(root)
+        serializer = self.get_serializer(root)()
+        return self.to_serializer(serializer, root, True)
 
     def get_serializer(self, root):
         payload_tag = etree.QName(root[1].tag).localname
         if payload_tag == 'SubmitStructureRequest':
-            serializers = import_module('fiesta.core.serializers.structure')
-            return serializers.RegistryInterfaceSubmitStructureRequestSerializer
+            return self.serializers.RegistryInterfaceSubmitStructureRequestSerializer
         elif payload_tag == 'SubmitRegistrationsRequest':
-            serializers = import_module('fiesta.core.serializers.structure')
-            return serializers.RegistryInterfaceSubmitRegistrationsRequestSerializer
+            return self.serializers.RegistryInterfaceSubmitRegistrationsRequestSerializer
         elif payload_tag == 'Structures':
-            serializers = import_module('fiesta.core.serializers.structure')
-            return serializers.StructureSerializer
+            return self.serializers.StructureSerializer
         else:
             return ParseError('Parsing a %s payload not implemented yet' % payload_tag) 
 
@@ -110,3 +112,55 @@ class XMLParser(BaseParser):
 
     def extend_cfg(self, cfg):
         return cfg
+
+    def to_serializer(self, serializer, element, complain):
+        """
+        Convert element to serializer
+
+        Any field values passed during serializer instantiation as keyword arguments are
+        overwritten.
+        """
+
+        serializer._element = element
+        qname = etree.QName(element.tag)
+        # First check that the element local name is the same as the Dataclass
+        # model_name (case insensitive). 
+        if complain:
+            if not serializer._meta.object_name.startswith(qname.localname):
+                raise TypeError(
+                    f'{qname} element can not be represented with a {serializer._meta.object_name}'
+                )
+        # Iterate through dataclass fields
+        for f in serializer._meta.fields: 
+            value = None
+            field_meta = f.metadata['fiesta']
+            tag = field_meta.tag
+            if field_meta.is_text:
+                value = decode(element.text, f.type)
+            elif field_meta.is_attribute:
+                value = decode(element.attrib.get(tag), f.type)
+                if not value: value = f.default
+            elif inspect.isclass(f.type):
+                if issubclass(f.type, self.serializers.Serializer):
+                    child_element = element.find(tag)
+                    if field_meta.localname == 'ConceptIdentity': breakpoint() # BREAKPOINT
+                    if etree.iselement(child_element):
+                        value = f.type(child_element, complain=False)
+                # Must be a simple element
+                else: 
+                    try:
+                        value = element.find(tag).text
+                    except AttributeError:
+                        pass
+            elif type(f.type) == type(Iterable):
+                value = self.serialize_many_elements(serializer, field_meta)
+            else:
+                raise KeyError(f'Encountered an unknown type field: {f.type}')
+            setattr(serializer, f.name, value)
+
+    def serialize_many_elements(self, serializer, field_meta):
+        item_type = field_meta.fld.type.__args__[0]
+        return (
+            item_type(child_element, complain=False)
+            for child_element in serializer._element.iterfind(field_meta.tag)
+        )

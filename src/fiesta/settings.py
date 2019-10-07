@@ -26,7 +26,7 @@ DEFAULTS = {
     'DEFAULT_LARGE_STRING_LENGTH': 255, 
     'DEFAULT_SCHEMA_PATH': os.path.join(os.path.expanduser('~'), 'schemas'),
     'DEFAULT_NEW_USER_PASSWORD': 'not_so_secret_password',
-    'DEFAULT_SERIALIZER_MODULE': 'fiesta.core.serializers.structure'
+    'DEFAULT_SERIALIZER_MODULE': 'fiesta.core.serializers'
 }
 
 IMPORT_STRINGS = [

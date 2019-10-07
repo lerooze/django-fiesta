@@ -3,15 +3,17 @@
 import inspect
 import modeltranslation
 
+from importlib import import_module
 from dataclasses import dataclass, fields, InitVar, field
+from django.apps import apps
 from django.conf import settings
 from django.db import models
-from lxml import etree
 from types import MappingProxyType
 from typing import Iterable
 
+from ...settings import api_settings
 from ...utils import inspect as fiesta_inspect
-from ...utils.coders import decode, encode
+from ...utils.coders import encode
 
 from .options import ClassOptions, FieldOptions
 
@@ -94,15 +96,16 @@ class Serializer(metaclass=BaseMetaSerializer):
     It must be subclassed to represent a specific SDMX artefact.
     A Serializer instance is created by:
         * a django model instance
-        * a SDMX etree element
         * key, value pairs of the class fields
+    It is also created when parsing SDMX messages using the to_serializer
+    method of the appropriate parser.
     After initialization the `process` method is used for CRUD database operations
     and the `to_element` method to deserialize into a SDMX etree element.
 
     Parameters
     ---------
-    instance_or_element: object
-        A django.db.Model or an etree.Element
+    instance: object
+        A django.db.Model
     complain: bool
         Set it to raise KeyError if wrong type `obj` or `element` is passed.
 
@@ -113,29 +116,25 @@ class Serializer(metaclass=BaseMetaSerializer):
 
     Notes
     -----
-    Initialization by `instance_or_element` arguments will overide any
+    Initialization by `instance` arguments will overide any
     provided field kwargs.
     """
 
-    instance_or_element: InitVar = None
+    instance: InitVar = None
     complain: InitVar = True
     
-    def __post_init__(self, instance_or_element, complain):
+    def __post_init__(self, instance, complain):
 
-        # Set on _serialize_element used for debugging 
+        # Set on to_serializer method of the appropriate parser
         self._element = None
 
         # Set on _serialize_instance used for debugging 
         self._instance = None
 
-        # Construct by element 
-        if isinstance(instance_or_element, etree._Element):
-            self._serialize_element(instance_or_element, complain)
-        # Construct by model_instnce
-        elif isinstance(instance_or_element, models.Model): 
-            self._serialize_instance(instance_or_element, complain)
+        if isinstance(instance, models.Model):
+            self._serialize_instance(instance, complain)
         else:
-            if instance_or_element:
+            if instance:
                 raise ValueError("Serializer is instantiated by model instance or element")
 
     def _serialize_instance(self, instance, complain):
@@ -185,59 +184,6 @@ class Serializer(metaclass=BaseMetaSerializer):
             value = (item_type(item) for item in item_set)
         return value
 
-    def _serialize_element(self, element, complain):
-        """
-        Private API that __post_init__ calls to serialize a SDMX lxml Element
-        object.
-
-        Any field values passed during instantiation as keyword arguments are
-        overwritten.
-        """
-
-        self._element = element
-        qname = etree.QName(element.tag)
-        # First check that the element local name is the same as the Dataclass
-        # model_name (case insensitive). 
-        if complain:
-            if not self._meta.object_name.startswith(qname.localname):
-                raise TypeError(
-                    f'{qname} element can not be represented with a {self._meta.object_name}'
-                )
-        # Iterate through dataclass fields
-        for f in self._meta.fields: 
-            value = None
-            field_meta = f.metadata['fiesta']
-            tag = field_meta.tag
-            if field_meta.is_text:
-                value = decode(element.text, f.type)
-            elif field_meta.is_attribute:
-                value = decode(element.attrib.get(tag), f.type)
-                if not value: value = f.default
-            elif inspect.isclass(f.type):
-                if issubclass(f.type, Serializer):
-                    child_element = element.find(tag)
-                    # if field_meta.localname == 'ConceptIdentity': breakpoint() # BREAKPOINT
-                    if etree.iselement(child_element):
-                        value = f.type(child_element, complain=False)
-                # Must be a simple element
-                else: 
-                    try:
-                        value = element.find(tag).text
-                    except AttributeError:
-                        pass
-            elif type(f.type) == type(Iterable):
-                value = self.serialize_many_elements(field_meta)
-            else:
-                raise KeyError(f'Encountered an unknown type field: {f.type}')
-            setattr(self, f.name, value)
-
-    def serialize_many_elements(self, field_meta):
-        item_type = field_meta.fld.type.__args__[0]
-        return (
-            item_type(child_element, complain=False)
-            for child_element in self._element.iterfind(field_meta.tag)
-        )
-
     def unroll(self):
         """
         Unroll instance by converting any (nested) iterable field values into
@@ -252,72 +198,14 @@ class Serializer(metaclass=BaseMetaSerializer):
             setattr(self, f.name, value)
         return self
 
-    def to_element(self, field=None, resource=None, detail=None):
-        """
-        Renders into a lxml Element object.
-
-        Parameters
-        ----------
-        field: Field
-            The field of the dataclass for nested calls.
-        resource: str  
-            The resource keyword argument if the method is called via SDMX
-            RESTful webservice call.
-        detail: str 
-            The detail keyword argument if the method is called via SDMX
-            RESTful webservice call.
-        """
-        tag = field.metadata['fiesta'].tag if field else self._meta.tag
-
-        # Fast field value lookup
-        getval = lambda f: getattr(self, f.name, None)
-
-        # Element detail full or stub
-        as_stub = self._to_element_as_stub(self._meta, detail, resource) 
-
-        # Get element attributes and create it
-        attrib = self._to_element_attrs(as_stub)
-        attrib = {key: value for key, value in attrib.items() if value}
-        element = self.make_element(tag, attrib)
-        
-        # Add children elements
-        for f in self._meta.non_attr_fields:
-            if f.name != 'name' and as_stub: continue
-            value = getval(f)
-            if not value: continue
-            field_meta = f.metadata['fiesta']
-            # If it is a text element set its text
-            if field_meta.is_text:
-                element.text = encode(getval(f), f.type)
-            elif inspect.isclass(f.type):
-                if issubclass(f.type, Serializer):
-                    child_field = getval(f) 
-                    if not child_field: continue
-                    element.append(child_field.to_element(f, resource, detail))
-                else:
-                    child_tag = f.metadata['fiesta'].tag
-                    child = etree.Element(child_tag)
-                    child.text = encode(getval(f), f.type)
-                    element.append(child)
-            elif type(f.type) == type(Iterable):
-                value = getval(f)
-                element.extend(item.to_element(f, resource, detail) 
-                               for item in value)
-            else:
-                raise KeyError(f'Encountered an unknown type field: {f.type} while rendering as an element')
-        return element
-
-    def make_element(self, tag, attrib):
-        return etree.Element(tag, attrib=attrib, nsmap=self._meta.nsmap)
-
-    def _to_element_as_stub(self, class_meta, detail, resource):
+    def as_stub(self, class_meta, detail, resource):
         """Returns True if element should be rendered as stub.
 
         Will be redifined in MaintainableSerializer
         """
         return False
 
-    def _to_element_attrs(self, as_stub):
+    def to_attrs(self, as_stub):
         """"""
         getval = lambda f: encode(getattr(self, f.name), f.type)
         attr_fields = ['object_id', 'agency_id', 'version'] if as_stub else self._meta.attr_fields
@@ -327,14 +215,14 @@ class Serializer(metaclass=BaseMetaSerializer):
             attrib['structureURL'] = self.make_structure_url()
         return attrib
 
-    def process(self, wrapper=None, field=None, context=None):
+    def process(self, wrapper=None, field=None, context=None, dsd=None):
         """
         Main entry point for CRUD database operations
 
         It inspects the instance and applies andy CRUD operations required.
 
         Args:
-            wrapper (FiestaDataclass): In a nested call it is the
+            wrapper (Serializer): In a nested call it is the
                 Serializer instance of the previous node.
             field(Field): The field that a nested process call is bound to.
             context (ProcessMeta): A ProcessContextOptions dataclass instance that is
@@ -379,10 +267,6 @@ class Serializer(metaclass=BaseMetaSerializer):
 
         # Set to True if generated object from process method should not be saved
         self._skip_save = False
-
-        # Set in MaintainableDataclass to store a reference to the
-        # SubmissionResultDataclass instance 
-        self._result = None
 
         # Perform initial validations before the field instances are processed
         # and any db object is made.
@@ -531,6 +415,16 @@ class Serializer(metaclass=BaseMetaSerializer):
     def get_queryset(cls, registration):
         kwargs = cls.build_filter_kwargs(registration)
         return cls._meta.model.filter(**kwargs)
+
+    @staticmethod
+    def get_from_reference(reference):
+        ref = reference.ref 
+        serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
+        serializer_name = f'{ref.cls}Serializer'
+        serializer = getattr(serializers, serializer_name)
+        model = apps.get_model(ref.package, ref.cls)
+        instance = model.get_from_ref(ref) 
+        return serializer(instance)
 
 class EmptySerializer(Serializer, metaclass=BaseEmptyMetaSerializer):
     """

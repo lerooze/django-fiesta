@@ -3,7 +3,8 @@
 from oscar.core.loading import is_model_registered
 
 from .abstract_models import (
-    AbstractText, AbstractAnnotation, AbstractFormat, AbstractRepresentation)
+    AbstractText, AbstractAnnotation, AbstractFormat, AbstractRepresentation,
+    AbstractReferencePeriod)
 
 __all__ = []
 
@@ -30,3 +31,9 @@ if not is_model_registered('common', 'Representation'):
         pass
 
     __all__.append('Representation')
+
+if not is_model_registered('common', 'ReferencePeriod'):
+    class ReferencePeriod(AbstractReferencePeriod):
+        pass
+
+    __all__.append('ReferencePeriod')

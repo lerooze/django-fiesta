@@ -75,7 +75,7 @@ class SDMXRESTfulStructureView(APIView):
             channel='RESTful_query',
             progress='Submitted',
         )
-        query_model = apps.get_model('registry', 'restfulquery')
+        query_model = apps.get_model('registry', 'restfulstructurequery')
         query_params = request.query_params
         for key, value in query_params:
             if key not in ['detail', 'references']:
@@ -104,5 +104,55 @@ class SDMXRESTfulStructureView(APIView):
         context = RESTfulQueryContextOptions(query)
         data = StructureSerializer().retrieve_restful(context)
         data._query = query 
+        log.update_progress('Finished')
+        return Response(data, status=status.HTTP_200_OK)
+
+class SDMXRESTfulSchemaView(APIView):
+
+    def get(self, request, context, agencyID, resourceID, version='latest'):
+
+        log_model = apps.get_model('registry', 'querylog')
+        log = log_model.objects.create(
+            user=request.user,
+            channel='RESTful_query',
+            progress='Submitted',
+        )
+        schema_query_model = apps.get_model('registry', 'restfulschemaquery')
+        structure_query_model = apps.get_model('registry', 'restfulstructurequery')
+        query_params = request.query_params
+        for key, value in query_params:
+            if key not in ['dimensionAtObservation']:
+                return Response(
+                    f'Query key {key} is not acceptable',
+                    status=status.HTTP_406_NOT_ACCEPTABLE
+                )
+            if value not in constants.QUERY_PARAMS['schema'][key]:
+                return Response(
+                    f'Query value {value} for query parameter {key} is not '
+                    'allowed',
+                    status=status.HTTP_405_METHOD_NOT_ALLOWED
+                )
+            observation_dimension = query_params.get('dimensionAtObservation', 'TIME_PERIOD') 
+        schema_query = schema_query_model.objects.create(
+            log = log,
+            context=context,
+            agency_id=agencyID,
+            resource_id=resourceID,
+            version=version,
+            observation_dimension=observation_dimension
+        )
+        structure_query = structure_query_model.objects.create(
+            log = log,
+            resource=context,
+            agency_id=agencyID,
+            resource_id=resourceID,
+            version=version,
+            detail='full',
+            references='children'
+        )
+        log.update_progress('Processing')
+        context = RESTfulQueryContextOptions(structure_query)
+        data = StructureSerializer().retrieve_restful(context)
+        data._query = schema_query
         log.update_progress('Finished')
         return Response(data, status=status.HTTP_200_OK)

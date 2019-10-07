@@ -153,7 +153,6 @@ class MaintainableArtefact(VersionableArtefact):
         if not created and self.is_final:
             raise clean_validators['MaintainableArtefact']['update']
 
-
 class AbstractText(models.Model):
     text = models.CharField(max_length=LARGE)
     text_type = models.CharField(max_length=SMALL,
@@ -249,3 +248,8 @@ class Component(IdentifiableArtefact):
             models.Index(fields=['concept_identity', 'wrapper']),
             models.Index(fields=['object_id', 'concept_identity', 'wrapper']),
         ]
+
+class AbstractReferencePeriod(models.Model):
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+

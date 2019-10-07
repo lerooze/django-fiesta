@@ -12,6 +12,8 @@ SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
 
 
 class AbstractDataStructure(common.MaintainableArtefact):
+    attachment_constraint = models.ManyToManyField('registry.AttachmentConstraint')
+    content_constraint = models.ManyToManyField('registry.ContentConstraint')
 
     class Meta(common.MaintainableArtefact.Meta):
         abstract = True
@@ -31,7 +33,10 @@ class AbstractDimensionList(ComponentList):
 
 class AbstractGroup(common.IdentifiableArtefact):
 
-    data_structure = models.ForeignKey('DataStructure', on_delete=models.CASCADE)
+    data_structure = models.ForeignKey(
+        'DataStructure', on_delete=models.CASCADE)
+    attachment_constraint = models.ForeignKey(
+        'registry.AttachmentConstraint', on_delete=models.CASCADE, null=True)
 
     class Meta(common.IdentifiableArtefact.Meta):
         abstract = True
@@ -135,6 +140,7 @@ class AbstractAttributeRelationship(models.Model):
         ]
 
 class AbstractDataflow(common.MaintainableArtefact):
+    content_constraint = models.ManyToManyField('registry.ContentConstraint')
     structure = models.ForeignKey('DataStructure', on_delete=models.CASCADE)
 
     class Meta:

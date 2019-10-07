@@ -2,7 +2,9 @@ from fiesta.apps.registry.abstract_models import (
     AbstractAcquisitionLog, AbstractQueryLog, AbstractSubmission,
     AbstractSubmitStructureRequest, AbstractSubmittedStructure,
     AbstractStatusMessage, AbstractStatusMessageText,
-    AbstractRESTfulQuery, AbstractProvisionAgreement)
+    AbstractRESTfulStructureQuery, AbstractRESTfulSchemaQuery,
+    AbstractProvisionAgreement
+)
 from oscar.core.loading import is_model_registered
 
 __all__ = []
@@ -49,11 +51,17 @@ if not is_model_registered('registry', 'StatusMessageText'):
 
     __all__.append('StatusMessageText')
 
-if not is_model_registered('registry', 'RESTfulQuery'):
-    class RESTfulRegistration(AbstractRESTfulQuery):
+if not is_model_registered('registry', 'RESTfulStructureQuery'):
+    class RESTfulStructureQuery(AbstractRESTfulStructureQuery):
         pass
 
-    __all__.append('RESTfulRegistration')
+    __all__.append('RESTfulStructureQuery')
+
+if not is_model_registered('registry', 'RESTfulSchemaQuery'):
+    class RESTfulSchemaQuery(AbstractRESTfulSchemaQuery):
+        pass
+
+    __all__.append('RESTfulSchemaQuery')
 
 if not is_model_registered('registry', 'ProvisionAgreement'):
     class ProvisionAgreement(AbstractProvisionAgreement):

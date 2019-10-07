@@ -114,9 +114,12 @@ class MaintainableManager(models.Manager):
             try:
                 return self.get(object_id=object_id, agency=agency, version=version) 
             except self.model.DoesNotExist:
+                # If an AttachmentConstraint reference create instance since DSDs are created before AttachmentConstraints are processed
+                if ref.cls == 'AttachmentConstraint':
+                    return self.create(object_id=object_id, agency=agency, version=version)
                 ref._context.result.status_message.update(
                     'Failure', 
-                    status.FIESTA_2406_AGENCY_NOT_REGISTERED,
+                    status.FIESTA_2406_MAINTAINABLE_ARTEFACT_INEXISTENT,
                 )
                 ref._stop = True
 
