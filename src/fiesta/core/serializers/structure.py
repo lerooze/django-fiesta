@@ -45,7 +45,6 @@ class ReferencePeriodSerializer(CommonSerializer):
         )
         return obj
 
-
 class RegistrySerializer(Serializer):
 
     class Meta:

@@ -1,7 +1,5 @@
 # abstract_models.py
 
-from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -9,247 +7,411 @@ from treebeard.mp_tree import MP_Node
 
 from ...core import constants
 from ...settings import api_settings 
-from ...core.validators import re_validators, errors, clean_validators
+from ...core.validators import re_validators, errors
 
 from . import managers
 
-SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
-TINY = api_settings.DEFAULT_TINY_STRING_LENGTH
-LARGE = api_settings.DEFAULT_LARGE_STRING_LENGTH
-REGULAR = api_settings.DEFAULT_STRING_LENGTH
+VERY_SMALL = api_settings.DEFAULT_VERY_SMALL_STRING
+MEDIUM = api_settings.DEFAULT_REGULAR_STRING
+VERY_LARGE = api_settings.DEFAULT_VERY_LARGE_STRING
 
-class AnnotableArtefact(models.Model):
-    annotations = GenericRelation(
-        'common.Annotation', verbose_name=_('Annotation'))
+class SmallString(models.Model):
+    text = models.CharField(
+        max_length=MEDIUM,
+        unique=True
+    )
 
     class Meta:
         abstract = True
 
-class IdentifiableArtefact(AnnotableArtefact):
+class LargeString(models.Model):
+    text = models.CharField(
+        max_length=VERY_LARGE,
+        db_index=True
+    )
+
+    class Meta:
+        abstract = True
+
+class Annotation(models.Model):
     object_id = models.CharField(
-        _('ID'), max_length=SMALL, validators=[re_validators['IDType']],
-        blank=True)
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        blank=True
+    )
+    annotation_title = models.CharField(
+        _('title'), 
+        max_length=MEDIUM,
+        blank=True
+    )
+    annotation_type = models.CharField(
+        _('type'), 
+        max_length=VERY_SMALL, 
+        blank=True
+    )
+    annotation_url = models.URLField(
+        _('URL'), 
+        blank=True
+    )
+    text = models.TextField(_('Text'), blank=True)
 
     class Meta:
         abstract = True
-        ordering = ['object_id']
-        indexes = [
-            models.Index(fields=['object_id']),
-        ]
-
-    def __str__(self):
-        return self.object_id 
-
-class NameableArtefact(IdentifiableArtefact):
-    text = GenericRelation('common.Text')
-    # name = GenericRelation('common.Text', verbose_name=_('Name'))
-    # description = GenericRelation('common.Text', verbose_name=_('Description'))
-
-    class Meta(IdentifiableArtefact.Meta):
-        abstract = True
-
-class Item(NameableArtefact):
-    wrapper = models.ForeignKey('MaintainableArtefact', on_delete=models.CASCADE)
-
-    objects = managers.ItemManager()
-
-    class Meta(NameableArtefact.Meta):
-        abstract = True
-        indexes = NameableArtefact.Meta.indexes[:] + [ 
-            models.Index(fields=['wrapper']),
-            models.Index(fields=['wrapper', 'object_id']),
-        ]
-        unique_together = ('wrapper', 'object_id')
-
-class ItemWithParent(Item, MP_Node):
-
-    objects = managers.ItemWithParentManager()
-
-    class Meta(Item.Meta):
-        abstract = True
-
-    def clean(self):
-        parent = self.get_parent()
-        if parent:
-            if self.wrapper != parent.wrapper:
-                raise ValidationError({
-                    'parent': errors['parent'],
-                })
-
-    def save(self, parent=None, **kwargs):
-        if not self.depth:
-            if parent:
-                self.depth = parent.depth + 1
-                parent.add_child(instance=self)
-            else:
-                self.add_root(instance=self)
-            return  #add_root and add_child save as well
-        super().save(**kwargs)
-
-class ManyToManyItemWithParent(NameableArtefact, MP_Node):
-
-    objects = managers.ManyToManyItemWithParentManager()
-
-    class Meta(NameableArtefact.Meta):
-        abstract = True
-
-    def clean(self):
-        parent = self.get_parent()
-        if parent:
-            if not self.wrappers.intersection(parent.wrappers):
-                raise ValidationError({
-                    'parent': errors['parent'],
-                })
-
-    def save(self, parent=None, **kwargs):
-        if not self.depth:
-            if parent:
-                self.depth = parent.depth + 1
-                parent.add_child(instance=self)
-            else:
-                self.add_root(instance=self)
-            return  #add_root and add_child save as well
-        super().save(**kwargs)
-
-class VersionableArtefact(NameableArtefact):
-    version = models.CharField(
-        _('Version'), max_length=TINY,
-        validators=[re_validators['VersionType']], default='1.0')
-    valid_from = models.DateTimeField(_('Valid from'), null=True, blank=True)
-    valid_to = models.DateTimeField(_('Valid to'), null=True, blank=True)
-
-    class Meta(NameableArtefact.Meta):
-        abstract = True
-        indexes = IdentifiableArtefact.Meta.indexes[:] + [ 
-            models.Index(fields=['object_id', 'version']),
-        ]
-
-class MaintainableArtefact(VersionableArtefact):
-    object_id = models.CharField('ID', max_length=SMALL,
-                               validators=[re_validators['IDType']])
-    agency = models.ForeignKey('base.Organisation', verbose_name=_('Agency'), on_delete=models.CASCADE) 
-    is_final = models.BooleanField(_('Is final'), default=False)
-    submitted_structure = models.OneToOneField('registry.SubmittedStructure', null=True, on_delete=models.CASCADE)
-    latest = models.BooleanField(default=False)
-
-    class Meta(VersionableArtefact.Meta):
-        abstract = True
-        unique_together = ('object_id', 'agency', 'version')
-        indexes = [
-            models.Index(fields=['object_id']),
-            models.Index(fields=['agency']),
-            models.Index(fields=['object_id', 'version']),
-            models.Index(fields=['object_id','agency', 'version']),
-        ]
-
-    objects = managers.MaintainableManager() 
-
-    def __str__(self):
-        return '%s:%s:%s' % (self.object_id, self.agency, self.version)
-
-    def clean(self):
-        # Block modification of final objects
-        created = not bool(self.pk)
-        if not created and self.is_final:
-            raise clean_validators['MaintainableArtefact']['update']
-
-class AbstractText(models.Model):
-    text = models.CharField(max_length=LARGE)
-    text_type = models.CharField(max_length=SMALL,
-                                 choices=constants.TEXT_TYPES, null=True,
-                                 blank=True)
-
-    content_type = models.ForeignKey(ContentType, null=True, blank=True,
-                                     on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
-    nameable_object = GenericForeignKey()
-
-    class Meta:
-        abstract = True
-
-    objects = managers.TextManager()
-
-class AbstractAnnotation(models.Model):
-    object_id = models.CharField('ID', max_length=SMALL, blank=True)
-    annotation_title = models.CharField('title', max_length=REGULAR,
-                                        blank=True)
-    annotation_type = models.CharField('type', max_length=SMALL, blank=True)
-    annotation_url = models.URLField('URL', null=True, blank=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    obj_id = models.PositiveIntegerField()
-    annotable_object = GenericForeignKey('content_type', 'obj_id')
-    annotation_text = GenericRelation('common.Text')
-
-    class Meta:
-        abstract = True
-
-    # objects = managers.AnnotationManager() 
+        verbose_name = _('Annotation')
+        verbose_name_plural = _('Annotations')
 
     def __str__(self):
         return '%s:%s:%s' % (self.object_id, self.annotation_title, self.annotation_type)
 
-class AbstractFormat(models.Model):
+class AbstractThrough(models.Model):
+    name = models.ForeignKey(
+        'common.MediumString',
+        null=True,
+        on_delete=models.CASCADE
+    )
+    description = models.ForeignKey(
+        'common.LargeString',
+        null=True,
+        on_delete=models.CASCADE
+    )
+    annotation = models.ForeignKey(
+        'common.Annotation',
+        null=True,
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        abstract = True
+
+class AbstractIdentifiable(models.Model):
+
+    class Meta:
+        abstract = True
+        ordering = ['object_id']
+
+    def __str__(self):
+        return self.object_id 
+
+class AbstractIdentifiable(AbstractIdentifiable):
+    object_id = models.CharField(
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        validators=[re_validators['IDType']],
+        blank=True,
+        db_index=True
+    )
+
+    class Meta:
+        ordering = ['object_id']
+        abstract = True
+
+class AbstractUIdentifiable(AbstractIdentifiable):
+    object_id = models.CharField(
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        validators=[re_validators['IDType']],
+        unique=True
+    )
+
+    class Meta:
+        abstract = True
+
+class AbstractNCNameIdentifiable(AbstractIdentifiable):
+    object_id = models.CharField(
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        validators=[re_validators['NCNameIDType']],
+        blank=True,
+        db_index=True
+    )
+
+    class Meta:
+        abstract = True
+
+class AbstractUNCNameIdentifiable(AbstractIdentifiable):
+    object_id = models.CharField(
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        validators=[re_validators['NCNameIDType']],
+        unique=True
+    )
+
+    class Meta:
+        abstract = True
+
+class AbstractNestedNCNameIdentifiable(AbstractIdentifiable):
+    object_id = models.CharField(
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        validators=[re_validators['NestedNCNameIDType']],
+        blank=True,
+        db_index=True
+    )
+
+    class Meta:
+        abstract = True
+
+class AbstractUNestedNCNameIdentifiable(AbstractIdentifiable):
+    object_id = models.CharField(
+        _('ID'), 
+        max_length=VERY_SMALL, 
+        validators=[re_validators['NestedNCNameIDType']],
+        unique=True
+    )
+
+    class Meta:
+        abstract = True
+
+class AbstractIDItem(AbstractUIdentifiable):
+    objects = managers.ItemManager()
+
+    class Meta(AbstractUIdentifiable.meta):
+        abstract = True
+
+class AbstractNCNameIDItem(AbstractUNCNameIdentifiable):
+    objects = managers.ItemManager()
+
+    class Meta(AbstractUNCNameIdentifiable.meta):
+        abstract = True
+
+class AbstractNestedNCNameIDItem(AbstractUNestedNCNameIdentifiable):
+    objects = managers.ItemManager()
+
+    class Meta(AbstractUNestedNCNameIdentifiable.meta):
+        abstract = True
+
+class AbstractItemWithParent(MP_Node):
+
+    objects = managers.ItemWithParentManager()
+
+    class Meta:
+        abstract = True
+
+    def clean(self):
+        parent = self.get_parent()
+        if parent:
+            if not self.containers.intersection(parent.wrappers):
+                raise ValidationError({
+                    'parent': errors['parent'],
+                })
+
+    def save(self, parent=None, **kwargs):
+        if not self.depth:
+            if parent:
+                self.depth = parent.depth + 1
+                parent.add_child(instance=self)
+            else:
+                self.add_root(instance=self)
+            return  #add_root and add_child save as well
+        super().save(**kwargs)
+
+class AbstractIDItemWithParent(AbstractUIdentifiable, AbstractItemWithParent):
+
+    class Meta(AbstractUIdentifiable.meta):
+        abstract = True
+
+class AbstractNCNameIDItemWithParent(AbstractUNCNameIdentifiable, AbstractItemWithParent):
+
+    class Meta(AbstractUNCNameIdentifiable.meta):
+        abstract = True
+
+class AbstractNestedNCNameIDItemWithParent(AbstractUNestedNCNameIdentifiable, AbstractItemWithParent):
+
+    class Meta(AbstractUNestedNCNameIdentifiable.meta):
+        abstract = True
+
+class AbstractMaintainable(models.Model):
+    agency = models.ForeignKey(
+        'base.Agency', 
+        verbose_name=_('Agency'), 
+        on_delete=models.PROTECT) 
+
+    objects = managers.MaintainableManager() 
+
+    class Meta:
+        abstract = True
+        ordering = ['agency', 'object_id']
+        constraint = [
+            models.UniqueConstraint(['object_id', 'agency'], 'unique')
+        ]
+        indexes = [
+            models.Index(fields=['object_id','agency']),
+        ]
+
+    def __str__(self):
+        return '%s:%s:%s' % (self.object_id, self.agency)
+
+class AbstractIDMaintainable(AbstractUIdentifiable, AbstractMaintainable):
+
+    class Meta(AbstractMaintainable.meta):
+        abstract = True
+
+class AbstractNCNameIDMaintainable(AbstractUNCNameIdentifiable, AbstractMaintainable):
+
+    class Meta(AbstractMaintainable.meta):
+        abstract = True
+
+class AbstractNestedNCNameIDMaintainable(AbstractUNestedNCNameIdentifiable, AbstractMaintainable):
+
+    class Meta(AbstractMaintainable.meta):
+        abstract = True
+
+class AbstractVersionable(models.Model):
+    major = models.IntegerField(default=1, db_index=True)
+    minor = models.IntegerField(default=0, db_index=True)
+    patch = models.IntegerField(null=True, db_index=True)
+    valid_from = models.DateTimeField(
+        _('Valid from'),
+        null=True,
+        blank=True)
+    valid_to = models.DateTimeField(
+        _('Valid to'),
+        null=True,
+        blank=True)
+    is_final = models.BooleanField(
+        _('Is final'), 
+        default=False)
+    submitted_structure = models.ManyToManyField('registry.SubmittedStructure')
+
+    class Meta:
+        abstract = True
+        ordering = ['-major', '-minor', '-patch']
+        indexes = [
+            models.Index(fields=['-major', '-minor', '-patch']),
+            models.Index(fields=['-minor', '-patch']),
+        ]
+        verbose_name = _('Versionable')
+        verbose_name_plural = _('Versionables')
+
+class Format(models.Model):
     text_type = models.CharField(
-        max_length=SMALL, 
+        _('Text type'),
+        max_length=VERY_SMALL, 
         choices=constants.DATA_TYPES,
         null=True, blank=True
     )
-    is_sequence = models.NullBooleanField(null=True, blank=True)
-    interval = models.DecimalField(null=True, blank=True, max_digits=19,
-                                   decimal_places=10)
-    start_value = models.DecimalField(null=True, blank=True, max_digits=19,
-                                      decimal_places=10)
-    end_value = models.DecimalField(null=True, blank=True, max_digits=19,
-                                    decimal_places=10)
-    time_interval = models.DurationField(null=True, blank=True)
-    start_time = models.DateTimeField(null=True, blank=True)
-    end_time = models.DateTimeField(null=True, blank=True)
-    min_length = models.PositiveIntegerField(null=True, blank=True)
-    max_length = models.PositiveIntegerField(null=True, blank=True)
-    min_value= models.DecimalField(null=True, blank=True, max_digits=19,
-                                   decimal_places=10)
-    max_value = models.DecimalField(null=True, blank=True, max_digits=19,
-                                    decimal_places=10)
-    decimals = models.PositiveIntegerField(null=True, blank=True)
-    pattern = models.TextField(null=True, blank=True)
-    is_multi_lingual = models.BooleanField(null=True, blank=True)
-
-    class Meta:
-        abstract = True
-
-class AbstractRepresentation(models.Model):
-
-    text_format = models.ForeignKey(
-        'Format', on_delete=models.CASCADE, null=True, blank=True,
-        related_name='+')
-    enumeration = models.ForeignKey(
-        'codelist.Codelist', on_delete=models.CASCADE, null=True, blank=True)
-    enumeration_format = models.ForeignKey(
-        'Format', on_delete=models.CASCADE, null=True, blank=True,
-        related_name='+')
-
-    class Meta:
-        abstract = True
-
-class Component(IdentifiableArtefact):
-
-    object_id = models.CharField(
-        _('ID'), max_length=SMALL, validators=[re_validators['NCNameIDType']],
+    is_sequence = models.NullBooleanField(
+        _('Is sequence'), 
+        null=True, 
+        blank=True)
+    interval = models.DecimalField(
+        _('Interval'),
+        null=True, 
+        blank=True,
+        max_digits=19, 
+        decimal_places=10)
+    start_value = models.DecimalField(
+        _('Start value'),
+        null=True, 
+        blank=True, 
+        max_digits=19, 
+        decimal_places=10)
+    end_value = models.DecimalField(
+        _('End value'),
+        null=True, 
+        blank=True, 
+        max_digits=19, 
+        decimal_places=10)
+    time_interval = models.DurationField(
+        _('Time interval'),
+        null=True, 
+        blank=True)
+    start_time = models.DateTimeField(
+        _('Start time'),
+        null=True, 
+        blank=True)
+    end_time = models.DateTimeField(
+        _('End time'),
+        null=True, blank=True)
+    min_length = models.PositiveIntegerField(
+        _('Minimum length'),
+        null=True, 
+        blank=True)
+    max_length = models.PositiveIntegerField(
+        _('Maximum length'), 
+        null=True, 
+        blank=True)
+    min_value= models.DecimalField(
+        _('Minimum value'),
+        null=True, 
+        blank=True, 
+        max_digits=19, 
+        decimal_places=10)
+    max_value = models.DecimalField(
+        _('Maximum value'),
+        null=True, 
+        blank=True, 
+        max_digits=19, 
+        decimal_places=10)
+    decimals = models.PositiveIntegerField(
+        _('Decimals'),
+        null=True, 
+        blank=True)
+    pattern = models.TextField(
+        _('Pattern'),
+        null=True, 
+        blank=True)
+    is_multi_lingual = models.BooleanField(
+        _('Is multi lingual'),
+        null=True, 
         blank=True)
 
     class Meta:
         abstract = True
-        unique_together = ('object_id', 'concept_identity', 'wrapper')
-        indexes = [
-            models.Index(fields=['object_id']),
-            models.Index(fields=['concept_identity']),
-            models.Index(fields=['object_id', 'concept_identity']),
-            models.Index(fields=['object_id', 'wrapper']),
-            models.Index(fields=['concept_identity', 'wrapper']),
-            models.Index(fields=['object_id', 'concept_identity', 'wrapper']),
-        ]
+        verbose_name = _('Format')
+        verbose_name_plural = _('Formats')
 
-class AbstractReferencePeriod(models.Model):
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
+class Representation(models.Model):
 
+    text_format = models.ForeignKey(
+        'common.Format', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        related_name='+', 
+        verbose_name=_('Text format'))
+    enumeration = models.ForeignKey(
+        'codelist.Codelist', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        verbose_name=_('Enumeration')
+    )
+    enumeration_format = models.ForeignKey(
+        'common.Format', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        related_name='+',
+        verbose_name=_('Enumeration format')
+    )
+
+    class Meta:
+        abstract = True
+        verbose_name = _('Representation')
+        verbose_name_plural = _('Representations')
+
+# class AbstractComponent(AbstractIdentifiable):
+#
+#     object_id = models.CharField(
+#         _('ID'), 
+#         max_length=SMALL, 
+#         validators=[re_validators['NCNameIDType']],
+#         blank=True,
+#         db_index=True
+#     )
+#
+#     class Meta:
+#         abstract = True
+#         unique_together = ('object_id', 'concept_identity', 'wrapper')
+#         indexes = [
+#             models.Index(fields=['concept_identity']),
+#             models.Index(fields=['object_id', 'concept_identity']),
+#             models.Index(fields=['object_id', 'wrapper']),
+#             models.Index(fields=['concept_identity', 'wrapper']),
+#             models.Index(fields=['object_id', 'concept_identity', 'wrapper']),
+#         ]
+#
+# class ReferencePeriod(models.Model):
+#     start_time = models.DateTimeField()
+#     end_time = models.DateTimeField()

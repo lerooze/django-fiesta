@@ -3,6 +3,7 @@
 from django.apps import apps
 from django.core.files.base import ContentFile
 from rest_framework import status 
+from rest_framework.exceptions import ParseError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -10,11 +11,15 @@ from ..core import constants
 from ..core.serializers.options import (
     ProcessContextOptions, RESTfulQueryContextOptions)
 from ..core.serializers.structure import StructureSerializer
+from ..core.exceptions import NotImplementedError, ParseSerializeError
+
+from ..permissions import IsAgencyUser
 
 class SubmitRegistrationsRequestView(APIView):
+    permission_classes = [IsAgencyUser]
 
     def post(self, request, format=None):
-        log_model = apps.get_model('registry', 'acquisitionlog')
+        log_model = apps.get_model('registry', 'log')
         log = log_model.objects.create(
             user=request.user,
             channel='Registry',
@@ -22,21 +27,29 @@ class SubmitRegistrationsRequestView(APIView):
         )
         log.update_progress('Negotiating Content')
         request.body
-        data = request.data
+        log.update_progress('Parsing')
+        try:
+            data = request.data
+        except (ParseError, ParseSerializeError, NotImplementedError) as exc:
+            exceptions_file = ContentFile(exc.detail)
+            log.exceptions_file.save(f'EXCEPTIONS_{data.m_header.id}', exceptions_file)
+            log.update_progress('Finished') 
+            raise exc
         log.update_progress('Processing')
         context = ProcessContextOptions(request, log)
         data.process(context=context)
-        log.update_progress('Negotiating Media')
         outdata = data.to_response()
         if data._context.result.submitted_structure.maintainable_object.ref.agency_id == 'MAIN':
             response_status = status.HTTP_400_BAD_REQUEST
         else:
             response_status = status.HTTP_200_OK
-        acquisition_file = ContentFile(request.stream)
-        log.acquisition_file.save(f'Ref_{data.m_header.id}.xml',
-                                              acquisition_file)
-        log.update_progress('Finished')
-        return Response(outdata, status=response_status)
+        request_file = ContentFile(request.stream)
+        log.request_file.save(f'REQUEST_{data.m_header.id}', request_file)
+        response = Response(outdata, status=response_status)
+        response_file = ContentFile(response)
+        log.response_file.save(f'RESPONSE_{data.m_header.id}', response_file)
+        log.update_progress('Finished') 
+        return response
 
 class SubmitStructureRequestView(APIView):
     

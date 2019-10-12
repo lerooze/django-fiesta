@@ -1,70 +1,61 @@
 from fiesta.apps.registry.abstract_models import (
-    AbstractAcquisitionLog, AbstractQueryLog, AbstractSubmission,
-    AbstractSubmitStructureRequest, AbstractSubmittedStructure,
-    AbstractStatusMessage, AbstractStatusMessageText,
-    AbstractRESTfulStructureQuery, AbstractRESTfulSchemaQuery,
-    AbstractProvisionAgreement
+    Text, Annotation, Log, SubmitStructureRequest, SubmittedStructure,
+    StatusMessage, StatusMessageText, Header, Party, 
 )
 from oscar.core.loading import is_model_registered
 
 __all__ = []
 
-if not is_model_registered('registry', 'AcquisitionLog'):
-    class AcquisitionLog(AbstractAcquisitionLog):
+if not is_model_registered('registry', 'Text'):
+    class Text(Text):
         pass
 
-    __all__.append('AcquisitionLog')
+    __all__.append('Text')
 
-if not is_model_registered('registry', 'QueryLog'):
-    class QueryLog(AbstractQueryLog):
+if not is_model_registered('registry', 'Annotation'):
+    class Annotation(Annotation):
         pass
 
-    __all__.append('AcquisitionLog')
+    __all__.append('Annotation')
 
-if not is_model_registered('registry', 'Submission'):
-    class Submission(AbstractSubmission):
+if not is_model_registered('registry', 'Log'):
+    class Log(Log):
         pass
 
-    __all__.append('Submission')
+    __all__.append('Log')
 
 if not is_model_registered('registry', 'SubmitStructureRequest'):
-    class SubmitStructureRequest(AbstractSubmitStructureRequest):
+    class SubmitStructureRequest(SubmitStructureRequest):
         pass
 
     __all__.append('SubmitStructureRequest')
 
 if not is_model_registered('registry', 'SubmittedStructure'):
-    class SubmittedStructure(AbstractSubmittedStructure):
+    class SubmittedStructure(SubmittedStructure):
         pass
 
     __all__.append('SubmittedStructure')
 
 if not is_model_registered('registry', 'StatusMessage'):
-    class StatusMessage(AbstractStatusMessage):
+    class StatusMessage(StatusMessage):
         pass
 
     __all__.append('StatusMessage')
 
 if not is_model_registered('registry', 'StatusMessageText'):
-    class StatusMessageText(AbstractStatusMessageText):
+    class StatusMessageText(StatusMessageText):
         pass
 
     __all__.append('StatusMessageText')
 
-if not is_model_registered('registry', 'RESTfulStructureQuery'):
-    class RESTfulStructureQuery(AbstractRESTfulStructureQuery):
+if not is_model_registered('registry', 'Header'):
+    class Header(Header):
         pass
 
-    __all__.append('RESTfulStructureQuery')
+    __all__.append('Header')
 
-if not is_model_registered('registry', 'RESTfulSchemaQuery'):
-    class RESTfulSchemaQuery(AbstractRESTfulSchemaQuery):
+if not is_model_registered('registry', 'Party'):
+    class Party(Party):
         pass
 
-    __all__.append('RESTfulSchemaQuery')
-
-if not is_model_registered('registry', 'ProvisionAgreement'):
-    class ProvisionAgreement(AbstractProvisionAgreement):
-        pass
-
-    __all__.append('ProvisionAgreement')
+    __all__.append('Party')

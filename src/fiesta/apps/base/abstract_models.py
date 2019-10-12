@@ -1,101 +1,279 @@
 # abstract_models.py
 
 from django.contrib.auth.models import AbstractUser
-from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
+from ...core.validators import re_validators
 from ...settings import api_settings
 
-from ..base.managers import ContactManager
 from ..common import abstract_models as common
 
+from . import managers
+
 SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
-TINY = api_settings.DEFAULT_TINY_STRING_LENGTH
-LARGE = api_settings.DEFAULT_LARGE_STRING_LENGTH
-REGULAR = api_settings.DEFAULT_STRING_LENGTH
 
-class AbstractUser(AbstractUser):
+class User(AbstractUser):
+    agency = models.ForeignKey(
+        'agency', 
+        null=True, 
+        blank=True,
+        verbose_name=_('Agency'))
+    data_provider = models.ForeignKey(
+        'data_provider', 
+        null=True, 
+        blank=True,
+        verbose_name=_('Data provider'))
+    data_consumer = models.ForeignKey(
+        'data_consumer', 
+        null=True, 
+        blank=True,
+        verbose_name=_('Data consumer'))
+
+    class Meta(AbstractUser.Meta):
+        abstract = True
+        verbose_name = _('User')
+        verbose_name_plural = _('Users')
+
+class Versionable(common.AbstractVersionable):
+    organisationunitscheme = models.ForeignKey(
+        'base.OrganisationUnitScheme',
+        verbose_name=_('Organisation unit scheme')
+    )
+
+    class Meta(common.AbstractVersionable.Meta):
+        abstract = True
+
+class AbstractBase(models.Model):
+    name = models.ForeignKey(
+        'common.MediumString', 
+        verbose_name=_('Name'), 
+        related_name='+',
+        null=True)
+    description = models.ForeignKey(
+        'common.LargeString', 
+        verbose_name=_('Description'), 
+        related_name='+',
+        null=True)
+    annotations = models.ManyToManyField(
+        'common.Annotation',
+        verbose_name=_('Annotations'),
+        related_name='+'
+    )
+
     class Meta:
         abstract = True
 
-class AbstractOrganisationScheme(common.MaintainableArtefact):
+class Agency(AbstractBase, common.AbstractNestedNCNameIDItemWithParent):
+    contacts = models.ManyToManyField(
+        'base.Contact',
+        verbose_name=_('Contacts'),
+    )
+
+    objects = managers.AgencyManager()
+
+    class Meta(common.AbstractItemWithParent.Meta):
+        abstract = True
+        verbose_name = _('Agency')
+        verbose_name_plural = _('Agencies')
+
+    def clean(self):
+        pass
+
+class DataProviderScheme(AbstractBase, common.AbstractIDMaintainable):
+    items = models.ManyToManyField(
+        'base.DataProvider',
+        verbose_name=_('Data providers'))
+
+    class Meta(common.AbstractIDMaintainable.Meta):
+        abstract = True
+        verbose_name = _('Data provider scheme')
+        verbose_name_plural = _('Data provider schemes')
+
+class DataProvider(AbstractBase, common.AbstractIDItem):
+    # contentconstraints = models.ManyToManyField(
+    #     'registry.ContentConstraint',
+    #     verbose_name=_('Content constraints'),
+    #     through='base.ContentConstraintThrough'
+    # )
+    contacts = models.ManyToManyField(
+        'base.Contact',
+        verbose_name=_('Contacts'),
+    )
+
+    class Meta(common.AbstractIDItem.Meta):
+        abstract = True
+        verbose_name = _('Data provider')
+        verbose_name_plural = _('Data providers')
+
+class DataConsumerScheme(common.AbstractIDMaintainable):
+    items = models.ManyToManyField(
+        'base.DataConsumer',
+        verbose_name=_('Data consumers'))
+
+    class Meta(common.AbstractIDMaintainable.Meta):
+        abstract = True
+        verbose_name = _('Data consumer scheme')
+        verbose_name_plural = _('Data consumer schemes')
+
+class DataConsumer(common.AbstractIDItem):
+    contacts = models.ManyToManyField(
+        'base.Contact',
+        verbose_name=_('Contacts'),
+    )
+
+    class Meta(common.AbstractIDItem.Meta):
+        abstract = True
+        verbose_name = _('Data consumer')
+        verbose_name_plural = _('Data consumers')
+
+class OrganisationUnitScheme(common.AbstractIDMaintainable):
+
+    class Meta(common.AbstractIDMaintainable.Meta):
+        abstract = True
+        verbose_name = _('Organisation unit scheme')
+        verbose_name_plural = _('Organisation unit schemes')
+
+class VersionableOrganisationUnitScheme(common.Versionable):
+    organisationunitscheme = models.ForeignKey(
+        'base.OrganisationUnitScheme',
+        verbose_name=_('Organisation unit scheme')
+    )
+    items = models.ManyToManyField(
+        'base.OrganisationUnit',
+        verbose_name=_('Organisation units')
+    )
+
+class AbstractItemBase(models.Model):
+    name = models.ManyToManyField(
+        'common.MediumString', 
+        verbose_name=_('Name'), 
+        through='ItemBaseDetail',
+        null=True)
+    description = models.ManyToManyField(
+        'common.Description', 
+        verbose_name=_('Description'), 
+        through='ItemBaseDetail',
+        null=True)
+    annotations = models.ManyToManyField(
+        'common.Annotation',
+        verbose_name=_('Annotations'),
+        through='ItemBaseDetail',
+        related_name='+'
+    )
     class Meta:
         abstract = True
 
-class AbstractOrganisation(common.ManyToManyItemWithParent):
-    content_constraint = models.ManyToManyField('registry.ContentConstraint')
-    wrappers = models.ManyToManyField('OrganisationScheme')
+class Through(common.AbstractThrough):
+    organisationunit = models.ForeignKey(
+        'base.OrganisationUnit',
+        null=True,
+        on_delete=models.CASCADE
+    )
+    organisationunitscheme = models.ForeignKey(
+        'base.VersionableOrganisationUnitScheme',
+        null=True,
+        on_delete=models.CASCADE
+    )
 
-    class Meta(common.ManyToManyItemWithParent.Meta):
-        abstract = True
-        # constraints = [
-        #     models.UniqueConstraint(fields=['object_id'], name='unique_id')
-        # ]
-    
-class AbstractContact(models.Model):
-    user = models.OneToOneField('User', on_delete=models.CASCADE)
-    organisation = models.ForeignKey('Organisation', on_delete=models.CASCADE)
-    text = GenericRelation('common.Text')
-    # names = GenericRelation('common.Text')
-    # roles = GenericRelation('common.Text')
-    # departments = GenericRelation('common.Text')
-
-    class Meta:
-        abstract = True
-        indexes = [
-            models.Index(fields=['user']),
-            models.Index(fields=['user', 'organisation']),
-        ]
-        constraints = [
-            models.UniqueConstraint(fields=['user', 'organisation'], name='unique_org_contact')
-        ]
+class OrganisationUnit(common.AbstractIDItemWithParent, base.AbstractItemBase):
+    contacts = models.ManyToManyField(
+        'Contact',
         
+    )
 
-    objects = ContactManager()
+    class Meta(common.AbstractItemWithParent.Meta):
+        abstract = True
+        verbose_name = _('Organisation unit')
+        verbose_name_plural = _('Organisation units')
 
-    def __str__(self):
-        return '%s: %s' % (self.user, self.organisation)
-
-    def send_password_reset_email(self, request):
-        from django.contrib.auth.forms import PasswordResetForm
-        form = PasswordResetForm({'email': self.email})
-        if form.is_valid():
-            form.save(
-                request=request,
-                use_https=True,
-                email_template_name='registration/password_reset_email.html')
-
-class AbstractTelephone(models.Model):
-    value = models.CharField('phone', max_length=SMALL)
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE)
+class AbstractContactReference(models.Model):
+    agency_set = models.ManyToManyField('base.Agency')
+    dataprovider_set = models.ManyToManyField('base.DataProvider')
+    dataconsumer_set = models.ManyToManyField('base.DataConsumer')
+    versionable_set = models.ManyToManyField('base.Versionable')
+    party_set = models.ManyToManyField('registry.Party')
 
     class Meta:
         abstract = True
 
-class AbstractFax(models.Model):
-    value = models.CharField('FAX', max_length=SMALL)
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE)
+class Contact(AbstractContactReference):
+    name = models.CharField(
+        max_length=SMALL,
+        verbose_name=_('Name'))
+    derartment = models.CharField(
+        max_length=SMALL,
+        verbose_name=_('Department'))
+    role = models.CharField(
+        max_length=SMALL,
+        verbose_name=_('Role'))
 
     class Meta:
         abstract = True
+        verbose_name = _('Contact')
+        verbose_name_plural = _('Contacts')
 
-class AbstractX400(models.Model):
-    value = models.CharField('X400', max_length=SMALL)
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE)
+class Telephone(models.Model):
+    value = models.CharField(_('phone'), max_length=SMALL)
+    contact = models.ForeignKey(
+        'Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact')
+    )
 
     class Meta:
         abstract = True
+        verbose_name = _('Telephone')
+        verbose_name_plural = _('Telephones')
+
+class Fax(models.Model):
+    value = models.CharField(_('FAX'), max_length=SMALL)
+    contact = models.ForeignKey(
+        'Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact')
+    )
+
+    class Meta:
+        abstract = True
+        verbose_name = _('Fax')
+        verbose_name_plural = _('Faxes')
+
+class X400(models.Model):
+    value = models.CharField(_('X400'), max_length=SMALL)
+    contact = models.ForeignKey(
+        'Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact')
+    )
+
+    class Meta:
+        abstract = True
+        verbose_name = _('X400')
+        verbose_name_plural = _('X400s')
 
 class AbstractURI(models.Model):
-    value = models.URLField('URI')
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE)
+    value = models.URLField(_('URI'))
+    contact = models.ForeignKey(
+        'Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact')
+    )
 
     class Meta:
         abstract = True
+        verbose_name = _('URI')
+        verbose_name_plural = _('URIs')
 
 class AbstractEmail(models.Model):
-    value = models.EmailField('email address')
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE)
+    value = models.EmailField(_('Email'))
+    contact = models.ForeignKey(
+        'Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact')
+    )
 
     class Meta:
         abstract = True
+        verbose_name = _('Email')
+        verbose_name_plural = _('Emails')

@@ -2,38 +2,36 @@
 
 from oscar.core.loading import is_model_registered
 
-from .abstract_models import (
-    AbstractText, AbstractAnnotation, AbstractFormat, AbstractRepresentation,
-    AbstractReferencePeriod)
+from .abstract_models import MediumString, LargeString, Annotation, Format, Representation
 
 __all__ = []
 
-if not is_model_registered('common', 'Text'):
-    class Text(AbstractText):
+if not is_model_registered('common', 'MediumString'):
+    class MediumString(MediumString):
         pass
 
-    __all__.append('Text')
+    __all__.append('MediumString')
+
+if not is_model_registered('common', 'LargeString'):
+    class LargeString(LargeString):
+        pass
+
+    __all__.append('LargeString')
 
 if not is_model_registered('common', 'Annotation'):
-    class Annotation(AbstractAnnotation):
+    class Annotation(Annotation):
         pass
 
     __all__.append('Annotation')
 
 if not is_model_registered('common', 'Format'):
-    class Format(AbstractFormat):
+    class Format(Format):
         pass
 
     __all__.append('Format')
 
 if not is_model_registered('common', 'Representation'):
-    class Representation(AbstractRepresentation):
+    class Representation(Representation):
         pass
 
     __all__.append('Representation')
-
-if not is_model_registered('common', 'ReferencePeriod'):
-    class ReferencePeriod(AbstractReferencePeriod):
-        pass
-
-    __all__.append('ReferencePeriod')

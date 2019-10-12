@@ -14,7 +14,10 @@ from zipfile import ZipFile, is_zipfile
 
 from ...settings import api_settings
 from ...utils.coders import decode 
-from ...utils.schema import Schema
+from ...core import constants
+from ...core.exceptions import NotImplementedError, ParseSerializeError
+
+from .schema import Schema21
 
 class XMLParser(BaseParser):
     """
@@ -37,12 +40,15 @@ class XMLParser(BaseParser):
         try:
             tree = etree.parse(stream)
         except (etree.ParseError, ValueError) as exc:
-            raise ParseError('XML parse error - %s' % exc)
+            raise ParseError(detail=f'XML parse error - {exc}')
         return tree.getroot()
 
     def validate_roottag(self):
-        if not self.root.tag.endswith('RegistryInterface'):
-            raise ParseError('Use a RegistryInterface SDMXML message for a POST submission Request')
+        """Check that roottag is proper given version
+
+        Redefine in subclasses"""
+        pass
+
 
     def parse(self, stream, media_type=None, parser_context=None):
         """
@@ -54,25 +60,15 @@ class XMLParser(BaseParser):
             version = '2.1'
         if version != '2.1':
             raise UnsupportedMediaType(media_type)
-        root = self.get_root(stream)
-        schema = Schema(root).schema
-        if schema:
-            if not schema(root):
-                errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]
-                raise ParseError(errors)
-        serializer = self.get_serializer(root)()
-        return self.to_serializer(serializer, root, True)
+        self.root = self.get_root(stream)
+        self.validate_roottag()
 
-    def get_serializer(self, root):
-        payload_tag = etree.QName(root[1].tag).localname
-        if payload_tag == 'SubmitStructureRequest':
-            return self.serializers.RegistryInterfaceSubmitStructureRequestSerializer
-        elif payload_tag == 'SubmitRegistrationsRequest':
-            return self.serializers.RegistryInterfaceSubmitRegistrationsRequestSerializer
-        elif payload_tag == 'Structures':
-            return self.serializers.StructureSerializer
-        else:
-            return ParseError('Parsing a %s payload not implemented yet' % payload_tag) 
+
+    def get_serializer_class(self):
+        """
+        Returns an appropriate serializer class
+
+        Redefine in subclasses"""
 
     def get_stream_from_location(self, location):
         cfg = self.create_configuration(location)
@@ -113,16 +109,17 @@ class XMLParser(BaseParser):
     def extend_cfg(self, cfg):
         return cfg
 
-    def to_serializer(self, serializer, element, complain):
+    def populate_serializer(self, serializer, complain):
         """
         Convert element to serializer
 
         Any field values passed during serializer instantiation as keyword arguments are
         overwritten.
+        Redefine in subclasses
         """
 
-        serializer._element = element
-        qname = etree.QName(element.tag)
+        serializer._elem = self.root 
+        qname = etree.QName(serializer._elem.tag)
         # First check that the element local name is the same as the Dataclass
         # model_name (case insensitive). 
         if complain:
@@ -130,37 +127,84 @@ class XMLParser(BaseParser):
                 raise TypeError(
                     f'{qname} element can not be represented with a {serializer._meta.object_name}'
                 )
+
+    def serialize_many_elements(self, serializer, field_meta):
+        item_type = field_meta.fld.type.__args__[0]
+        for child_element in serializer._elem.itefind(field_meta.tag):
+            child_serializer = item_type()
+            child_serializer._elem = child_element
+            self.populate_serializer(child_serializer, False)
+            yield child_serializer
+
+class XMLParser21(XMLParser):
+
+    def parse(self, stream, media_type=None, parser_context=None):
+        super().parse(stream, media_type, parser_context)
+        self.validate_roottag()
+        schema = Schema21(self.root).schema
+        if not schema(self.root):
+            errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]
+            raise ParseError(errors)
+        serializer_class = self.get_serializer_class()
+        return self.populate_serializer(serializer_class(), True)
+
+    def get_serializer_class(self):
+        payload_tag = etree.QName(self.root[1].tag).localname
+        if payload_tag == 'SubmitStructureRequest':
+            return self.serializers.RegistryInterfaceSubmitStructureRequestSerializer
+        elif payload_tag == 'SubmitRegistrationsRequest':
+            return self.serializers.RegistryInterfaceSubmitRegistrationsRequestSerializer
+        elif payload_tag == 'Structures':
+            return self.serializers.StructureSerializer
+        else:
+            return NotImplementedError('Parsing a {payload_tag} payload not yet implemented') 
+
+    def validate_roottag(self, root):
+        """Check that roottag is proper given version
+        """
+        roottag = etree.QName(root.tag)
+        if roottag.namespace != constants.NAMESPACE_MAP['message']:
+            raise ParseError(detail='Invalid root tag: {roottag.text}')
+        if roottag.localname not in constants.SDMX_XML21_MESSAGES:
+            raise ParseError(detail='Invalid root tag localname: {roottag.localname}')
+        if roottag.localname not in constants.IMPLEMENTED_SDMX21_MESSAGES:
+            raise NotImplementedError(detail='Parsing SDMX-ML {roottag.localname} not implemented')
+
+    def populate_serializer(self, serializer, complain):
+        """
+        Convert element to serializer
+
+        Any field values passed during serializer instantiation as keyword arguments are
+        overwritten.
+        """
+        super().populate_serializer(serializer, complain)
+
         # Iterate through dataclass fields
         for f in serializer._meta.fields: 
             value = None
             field_meta = f.metadata['fiesta']
             tag = field_meta.tag
             if field_meta.is_text:
-                value = decode(element.text, f.type)
+                value = decode(serializer._elem.text, f.type)
             elif field_meta.is_attribute:
-                value = decode(element.attrib.get(tag), f.type)
+                value = decode(serializer._elem.attrib.get(tag), f.type)
                 if not value: value = f.default
             elif inspect.isclass(f.type):
                 if issubclass(f.type, self.serializers.Serializer):
-                    child_element = element.find(tag)
-                    if field_meta.localname == 'ConceptIdentity': breakpoint() # BREAKPOINT
+                    child_element = serializer._elem.find(tag)
                     if etree.iselement(child_element):
-                        value = f.type(child_element, complain=False)
+                        child_serializer = f.type()
+                        child_serializer._elem = child_element
+                        self.populate_serializer(child_serializer, False)
+                        value = child_serializer
                 # Must be a simple element
                 else: 
                     try:
-                        value = element.find(tag).text
+                        value = serializer._elem.find(tag).text
                     except AttributeError:
                         pass
             elif type(f.type) == type(Iterable):
                 value = self.serialize_many_elements(serializer, field_meta)
             else:
-                raise KeyError(f'Encountered an unknown type field: {f.type}')
+                raise ParseSerializeError(f'Encountered an unknown type field: {f.type}')
             setattr(serializer, f.name, value)
-
-    def serialize_many_elements(self, serializer, field_meta):
-        item_type = field_meta.fld.type.__args__[0]
-        return (
-            item_type(child_element, complain=False)
-            for child_element in serializer._element.iterfind(field_meta.tag)
-        )

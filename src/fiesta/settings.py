@@ -19,18 +19,20 @@ from django.test.signals import setting_changed
 
 DEFAULTS = {
     'DEFAULT_SENDER_ID': 'FIESTA',
-    'DEFAULT_TINY_STRING_LENGTH': 15, 
-    'DEFAULT_VERY_SMALL_STRING_LENGTH': 31, 
-    'DEFAULT_SMALL_STRING_LENGTH': 63, 
-    'DEFAULT_STRING_LENGTH': 127, 
-    'DEFAULT_LARGE_STRING_LENGTH': 255, 
+    'DEFAULT_TINY_STRING': 15, 
+    'DEFAULT_VERY_SMALL_STRING': 31, 
+    'DEFAULT_SMALL_STRING': 63, 
+    'DEFAULT_MEDIUM_STRING': 127, 
+    'DEFAULT_LARGE_STRING': 255, 
+    'DEFAULT_VERY_LARGE_STRING': 511, 
+    'DEFAULT_HUGE_STRING': 1023, 
     'DEFAULT_SCHEMA_PATH': os.path.join(os.path.expanduser('~'), 'schemas'),
     'DEFAULT_NEW_USER_PASSWORD': 'not_so_secret_password',
-    'DEFAULT_SERIALIZER_MODULE': 'fiesta.core.serializers'
+    'DEFAULT_SERIALIZER_MODULE': 'fiesta.core.serializers',
+    'DEFAULT_TOP_AGENCY': 'FIESTA',
 }
 
-IMPORT_STRINGS = [
-]
+IMPORT_STRINGS = []
 
 def perform_import(val, setting_name):
     """

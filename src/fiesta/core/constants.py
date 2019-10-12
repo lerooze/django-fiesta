@@ -98,9 +98,12 @@ METADATA_TARGET_TYPES = (
 )
 
 TEXT_TYPES = (
+    ('text', 'text'),
     ('name', 'name'),
     ('description', 'description'),
-    ('annotation_text', 'annotation_text'),
+    ('annotation', 'annotation'),
+    ('role', 'role'),
+    ('department', 'department'),
 )
 
 DATA_TYPES = ( 
@@ -375,3 +378,22 @@ RESOURCE2MAINTAINABLE = {
     'datastructure': 'data_structure',
     'dataflow': 'dataflow',
 }
+
+SDMX_ML21_MESSAGES = [
+    'Structure', 'GenericData', 'GenericTimeSeriesData',
+    'StructureSpecificData', 'StructureSpecificTimeSeriesData',
+    'GenericMetadata', 'StructureSpecificMetadata', 'RegistryInterface',
+    'StructureSpecificDataQuery', 'GenericDataQuery',
+    'GenericTimeSeriesDataQuery', 'StructureSpecificTimeSeriesDataQuery',
+    'GenericMetadataQuery', 'StructureSpecificMetadataQuery',
+    'DataSchemaQuery', 'MetadataSchemaQuery', 'StructuresQuery',
+    'DataflowQuery', 'MetadataflowQuery', 'DataStructureQuery',
+    'MetadataStructureQuery', 'CategorySchemeQuery', 'ConceptSchemeQuery',
+    'CodelistQuery', 'HierarchicalCodelistQuery', 'OrganisationSchemeQuery',
+    'ReportingTaxonomyQuery', 'StructureSetQuery', 'ProcessQuery',
+    'CategorisationQuery', 'ProvisionAgreementQuery', 'ConstraintQuery'
+]
+
+IMPLEMENTED_SDMX_ML21_MESSAGES = [
+    'Structure', 'RegistryInterface'
+]

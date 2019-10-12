@@ -51,6 +51,7 @@ class XMLRenderer(BaseRenderer):
 
         def generate_simple_type():
             for dimension in dsd.dimension_list:
+                pass
 
 
 
