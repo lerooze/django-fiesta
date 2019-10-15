@@ -13,10 +13,10 @@ from ..core.serializers.options import (
 from ..core.serializers.structure import StructureSerializer
 from ..core.exceptions import NotImplementedError, ParseSerializeError
 
-from ..permissions import IsAgencyUser
+from ..permissions import HasMaintainablePermission
 
-class SubmitRegistrationsRequestView(APIView):
-    permission_classes = [IsAgencyUser]
+class SubmitStructureRequestView(APIView):
+    permission_classes = [HasMaintainablePermission]
 
     def post(self, request, format=None):
         log_model = apps.get_model('registry', 'log')
@@ -51,7 +51,7 @@ class SubmitRegistrationsRequestView(APIView):
         log.update_progress('Finished') 
         return response
 
-class SubmitStructureRequestView(APIView):
+class SubmitRegistrationsRequestView(APIView):
     
     def post(self, request, format=None):
         log_model = apps.get_model('registry', 'acquisitionlog')

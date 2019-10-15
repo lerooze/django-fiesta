@@ -140,7 +140,6 @@ class XMLParser21(XMLParser):
 
     def parse(self, stream, media_type=None, parser_context=None):
         super().parse(stream, media_type, parser_context)
-        self.validate_roottag()
         schema = Schema21(self.root).schema
         if not schema(self.root):
             errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]

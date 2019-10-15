@@ -1,77 +1,89 @@
 # models.py
 
 from .abstract_models import (
-    AbstractDataStructure, AbstractDimensionList, AbstractGroup,
-    AbstractAttributeList, AbstractMeasureList, AbstractDimension,
-    AbstractGroupDimension, AbstractPrimaryMeasure, AbstractAttribute,
-    AbstractAttributeRelationship, AbstractDataflow)
+    DataStructureReference, DataStructure, DimensionList, Group, AttributeList,
+    MeasureList, Dimension, GroupDimension, PrimaryMeasure, Attribute,
+    AttributeRelationship, DataflowReference, Dataflow
+)
 
 from oscar.core.loading import is_model_registered
 
 __all__ = []
 
+if not is_model_registered('datastructure', 'DataStructureReference'):
+    class DataStructureReference(DataStructureReference):
+        pass
+
+    __all__.append('DataStructureReference')
+
 if not is_model_registered('datastructure', 'DataStructure'):
-    class DataStructure(AbstractDataStructure):
+    class DataStructure(DataStructure):
         pass
 
     __all__.append('DataStructure')
 
 if not is_model_registered('datastructure', 'DimensionList'):
-    class DimensionList(AbstractDimensionList):
+    class DimensionList(DimensionList):
         pass
 
     __all__.append('DimensionList')
     
 if not is_model_registered('datastructure', 'Group'):
-    class Group(AbstractGroup):
+    class Group(Group):
         pass
 
     __all__.append('Group')
 
 if not is_model_registered('datastructure', 'AttributeList'):
-    class AttributeList(AbstractAttributeList):
+    class AttributeList(AttributeList):
         pass
 
     __all__.append('AttributeList')
 
 if not is_model_registered('datastructure', 'MeasureList'):
-    class MeasureList(AbstractMeasureList):
+    class MeasureList(MeasureList):
         pass
 
     __all__.append('MeasureList')
 
 if not is_model_registered('datastructure', 'Dimension'):
-    class Dimension(AbstractDimension):
+    class Dimension(Dimension):
         pass
 
     __all__.append('Dimension')
 
 if not is_model_registered('datastructure', 'GroupDimension'):
-    class GroupDimension(AbstractGroupDimension):
+    class GroupDimension(GroupDimension):
         pass
 
     __all__.append('GroupDimension')
 
 if not is_model_registered('datastructure', 'PrimaryMeasure'):
-    class PrimaryMeasure(AbstractPrimaryMeasure):
+    class PrimaryMeasure(PrimaryMeasure):
         pass
 
     __all__.append('PrimaryMeasure')
 
 if not is_model_registered('datastructure', 'Attribute'):
-    class Attribute(AbstractAttribute):
+    class Attribute(Attribute):
         pass
 
     __all__.append('Attribute')
 
 if not is_model_registered('datastructure', 'AttributeRelationship'):
-    class AttributeRelationship(AbstractAttributeRelationship):
+    class AttributeRelationship(AttributeRelationship):
         pass
 
     __all__.append('AttributeRelationship')
 
+if not is_model_registered('datastructure', 'DataflowReference'):
+    class DataflowReference(DataflowReference):
+        pass
+
+    __all__.append('DataflowReference')
+
 if not is_model_registered('datastructure', 'Dataflow'):
-    class Dataflow(AbstractDataflow):
+    class Dataflow(Dataflow):
         pass
 
     __all__.append('Dataflow')

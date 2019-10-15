@@ -1,3 +1,5 @@
+# constants.py
+
 ORGANISATION_TYPES = (
     (None, 'None'),
     ('Agency', 'Agency'),
@@ -6,10 +8,6 @@ ORGANISATION_TYPES = (
     ('OrganisationUnit', 'OranisationUnit'),
 )
 
-CONTENT_CONSTRAINT_TYPE_CODE = (
-    ('Actual', 'Actual'),
-    ('Allowed', 'Allowed'),
-)
 
 DIMENSION_TYPES = (
     ("dimension", "dimension"),
@@ -97,63 +95,14 @@ METADATA_TARGET_TYPES = (
     ('IdentifiableObjectTarget', 'IdentifiableObjectTarget'),
 )
 
-TEXT_TYPES = (
-    ('text', 'text'),
-    ('name', 'name'),
-    ('description', 'description'),
-    ('annotation', 'annotation'),
-    ('role', 'role'),
-    ('department', 'department'),
-)
-
-DATA_TYPES = ( 
-    (None, 'None'),
-    ('String', 'String'),
-    ('Alpha', 'Alpha'),
-    ('AlphaNumeric', 'AlphaNumeric'),
-    ('Numeric', 'Numeric'),
-    ('BigInteger', 'BigInteger'),
-    ('Integer', 'Integer'),
-    ('Long', 'Long'),
-    ('Short', 'Short'),
-    ('Decimal', 'Decimal'),
-    ('Float', 'Float'),
-    ('Double', 'Double'),
-    ('Boolean', 'Boolean'),
-    ('URI', 'URI'),
-    ('Count', 'Count'),
-    ('InclusiveValueRange', 'InclusiveValueRange'),
-    ('ExclusiveValueRange', 'ExclusiveValueRange'),
-    ('Incremental', 'Incremental'),
-    ('ObservationalTimePeriod', 'ObservationalTimePeriod'),
-    ('StandardTimePeriod', 'StandardTimePeriod'),
-    ('BasicTimePeriod', 'BasicTimePeriod'),
-    ('GregorianTimePeriod', 'GregorianTimePeriod'),
-    ('GregorianYear', 'GregorianYear'),
-    ('GregorianYearMonth', 'GregorianYearMonth'),
-    ('GregorianDay', 'GregorianDay'),
-    ('ReportingTimePeriod', 'ReportingTimePeriod'),
-    ('ReportingYear', 'ReportingYear'),
-    ('ReportingSemester', 'ReportingSemester'),
-    ('ReportingTrimester', 'ReportingTrimester'),
-    ('ReportingQuarter', 'ReportingQuarter'),
-    ('ReportingMonth', 'ReportingMonth'),
-    ('ReportingWeek', 'ReportingWeek'),
-    ('ReportingDay', 'ReportingDay'),
-    ('DateTime', 'DateTime'),
-    ('TimeRange', 'TimeRange'),
-    ('Month', 'Month'),
-    ('MonthDay', 'MonthDay'),
-    ('Day', 'Day'),
-    ('Time', 'Time'),
-    ('Duration', 'Duration'),
-    ('XHTML', 'XHTML'),
-    ('KeyValues', 'KeyValues'),
-    ('IdentifiableReference', 'IdentifiableReference'),
-    ('DataSetReference', 'DataSetReference'),
-    ('AttachmentConstraintReference', 'AttachmentConstraintReference'),
-)
-
+# TEXT_TYPES = (
+#     ('text', 'text'),
+#     ('name', 'name'),
+#     ('description', 'description'),
+#     ('annotation', 'annotation'),
+#     ('role', 'role'),
+#     ('department', 'department'),
+# )
 
 CLASS_TYPES = (
     (None, 'None'),
@@ -241,12 +190,6 @@ PACKAGE_TYPES = (
     ("conceptscheme", "conceptscheme"),
 )
 
-DIMENSION_TYPES =(
-    ('Dimension', 'Dimension'),
-    ('TimeDimension', 'TimeDimension'),
-    ('MeasureDimension', 'MeasureDimension')
-)
-
 METATDATA_TARGET_COMPONENTS = (
     ('DIMENSION_DESCRIPTOR_VALUES_TARGET', 'KeyDescriptorValuesTarget'),
     ('DATA_SET_TARGET', 'DataSetTarget'),
@@ -255,28 +198,17 @@ METATDATA_TARGET_COMPONENTS = (
     ('IDENTIFIABLE_OBJECT_TARGET', 'IdentifiableObjectTarget')
 )
 
-TOKENS = (
-    ('Value', 'Value'),
-    ('Name', 'Name'),
-    ('Desription', 'Description')
-)
+# TOKENS = (
+#     ('Value', 'Value'),
+#     ('Name', 'Name'),
+#     ('Desription', 'Description')
+# )
 
-ACTIONS = (
-    ('Append', 'Append'),
-    ('Replace', 'Replace'),
-    ('Delete', 'Delete'),
-)
-
-PROGRESS = (
-    ('Finished', 'Finished'),
-    ('Processing', 'Processing'),
-)
-
-LANGUAGES = (
-    ('en', 'English'),
-    ('gr', 'Greek'),
-    ('fr', 'French'),
-)
+# LANGUAGES = (
+#     ('en', 'English'),
+#     ('gr', 'Greek'),
+#     ('fr', 'French'),
+# )
 
 NAMESPACE_MAP = {
     'common': 'http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common',
@@ -292,8 +224,6 @@ NAMESPACE_MAP = {
     'xml': 'http://www.w3.org/XML/1998/namespace',
     # None: None,
 }
-
-# NAMESPACE_CLEAN = {key:val for key, val in NAMESPACE.items() if key}
 
 CLASS2WRAPPER = {
     'AgencySchemeDataclass': 'OrganisationSchemes',
@@ -345,26 +275,15 @@ QUERY_PARAMS = {
     }
 }
 
-CHANNELS = (
-    ('Registry', 'Registry'),
-    ('Upload', 'Upload'),
-    ('Interactive', 'Interactive'),
-    ('RESTful_query', 'RESTful_query'),
-    ('SOAP_query', 'SOAP_query'),
-    ('RESTful_GUI_query', 'RESTful_GUI_query'),
-    ('SOAP_GUI_query', 'SOAP_GUI_query'),
-)
-
-STATUSES = (
-    ('Success', 'Success'),
-    ('Warning', 'Warning'),
-    ('Failure', 'Failure')
-)
-
-ASSIGNMENT_STATUS = (
-    ('Mandatory', 'Mandatory'),
-    ('Conditional', 'Conditional')
-)
+# CHANNELS = (
+#     ('Registry', 'Registry'),
+#     ('Upload', 'Upload'),
+#     ('Interactive', 'Interactive'),
+#     ('RESTful_query', 'RESTful_query'),
+#     ('SOAP_query', 'SOAP_query'),
+#     ('RESTful_GUI_query', 'RESTful_GUI_query'),
+#     ('SOAP_GUI_query', 'SOAP_GUI_query'),
+# )
 
 RESOURCE2MAINTAINABLE = {
     'organisationscheme': ('agency_scheme', 'data_consumer_scheme',

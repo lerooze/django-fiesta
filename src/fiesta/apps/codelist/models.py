@@ -2,27 +2,15 @@
 
 from oscar.core.loading import is_model_registered
 
-from .abstract_models import Text, Annotation, Versionable, Codelist, Code
+from .abstract_models import CodelistReference, Codelist, Code
 
 __all__ = []
 
-if not is_model_registered('base', 'Text'):
-    class Text(Text):
+if not is_model_registered('codelist', 'CodelistReference'):
+    class CodelistReference(CodelistReference):
         pass
 
-    __all__.append('Text')
-
-if not is_model_registered('base', 'Annotation'):
-    class Annotation(Annotation):
-        pass
-
-    __all__.append('Annotation')
-
-if not is_model_registered('base', 'Versionable'):
-    class Versionable(Versionable):
-        pass
-
-    __all__.append('Versionable')
+    __all__.append('CodelistReference')
 
 if not is_model_registered('codelist', 'Codelist'):
     class Codelist(Codelist):

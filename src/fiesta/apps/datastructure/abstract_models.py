@@ -2,146 +2,270 @@
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from model_utils import Choices
 
 from ...settings import api_settings
-from ...core import constants
-
 from ..common import abstract_models as common
 
-SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
+TINY = api_settings.DEFAULT_TINY_STRING
 
+class DataStructureReference(common.AbstractReference):
+    class Meta:
+        abstract = True
+        verbose_name = _('Data structure reference')
+        verbose_name_plural = _('Data structure references')
 
-class AbstractDataStructure(common.MaintainableArtefact):
-    attachment_constraint = models.ManyToManyField('registry.AttachmentConstraint')
-    content_constraint = models.ManyToManyField('registry.ContentConstraint')
+class DataStructure(common.AbstractMaintainable):
+    content_constraint = models.ForeignKey(
+        'registry.ContentConstraintReference',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_('Content constraint reference')
+    )
 
-    class Meta(common.MaintainableArtefact.Meta):
+    class Meta(common.AbstractMaintainable.Meta):
         abstract = True
 
-class ComponentList(common.AnnotableArtefact):
+class AbstractComponentList(common.AbstractAnnotatable):
 
     data_structure = models.OneToOneField(
-        'DataStructure', on_delete=models.CASCADE)
+        'DataStructure', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Data structure')
+    )
 
-    class Meta(common.AnnotableArtefact.Meta):
+    class Meta:
         abstract = True
 
-class AbstractDimensionList(ComponentList):
+class DimensionList(AbstractComponentList):
 
-    class Meta(ComponentList.Meta):
+    class Meta:
         abstract = True
 
-class AbstractGroup(common.IdentifiableArtefact):
+class Group(common.AbstractIdentifiable):
 
     data_structure = models.ForeignKey(
-        'DataStructure', on_delete=models.CASCADE)
+        'DataStructure', 
+        on_delete=models.CASCADE,
+        verbose_name=_('Data structure')
+    )
     attachment_constraint = models.ForeignKey(
-        'registry.AttachmentConstraint', on_delete=models.CASCADE, null=True)
+        'registry.AttachmentConstraintReference', 
+        on_delete=models.SET_NULL, 
+        null=True,
+        verbose_name=_('Attachment constraint reference')
+    )
 
-    class Meta(common.IdentifiableArtefact.Meta):
+    class Meta:
         abstract = True
-        unique_together = ('object_id', 'data_structure')
-        indexes = [
-            models.Index(fields=['object_id']),
-            models.Index(fields=['data_structure']),
-            models.Index(fields=['object_id', 'data_structure']),
+        constraint = [
+            models.UniqueConstraint(
+                fields=['data_structure', 'object_id'],
+                name='unique_group'
+            )
         ]
+        indexes = [
+            models.Index(fields=['data_structure', 'object_id']),
+        ]
+        ordering = ['data_structure', 'object_id']
 
-class AbstractAttributeList(ComponentList):
+class AttributeList(AbstractComponentList):
 
-    class Meta(ComponentList.Meta):
+    class Meta:
         abstract = True
 
-class AbstractMeasureList(ComponentList):
+class MeasureList(AbstractComponentList):
 
-    class Meta(ComponentList.Meta):
+    class Meta:
         abstract = True
 
-class AbstractDimension(common.Component):
-
-    wrapper = models.ForeignKey(
-        'DimensionList', on_delete=models.CASCADE)
+class Dimension(common.AbstractComponent):
+    TYPE_CHOICES = Choices( 
+        (0, 'DIMENSION', 'Dimension'),
+        (1, 'TIME_DIMENSION', 'TimeDimension'),
+        (2, 'MEASURE_DIMENSION', 'MeasureDimension')
+    )
+    container = models.ForeignKey(
+        'DimensionList', 
+        on_delete=models.CASCADE
+    )
     concept_identity = models.ForeignKey(
-        'conceptscheme.Concept', on_delete=models.CASCADE,
+        'conceptscheme.ConceptReference',
+        on_delete=models.PROTECT,
         related_name='dimension_concept_identity_set',
-        related_query_name='dimension_concept_identity')
+        related_query_name='dimension_concept_identity',
+        verbose_name=_('Concept identity')
+    )
     local_representation = models.ForeignKey(
-        'common.Representation', on_delete=models.CASCADE)
+        'common.Representation', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Local represenation')
+    )
     measure_local_representation = models.ForeignKey(
-        'conceptscheme.ConceptScheme', on_delete=models.CASCADE)
+        'conceptscheme.ConceptSchemeReference', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Local representation')
+    )
     concept_role = models.ManyToManyField(
-        'conceptscheme.Concept', related_name='dimension_concept_role_set',
-        related_query_name='dimension_concept_role')
+        'conceptscheme.ConceptReference', 
+        related_name='dimension_concept_role_set',
+        related_query_name='dimension_concept_role',
+        verbose_name=_('Concept roles')
+    )
     position = models.IntegerField(_('position'))
-    tipe = models.CharField(_('type'), max_length=SMALL, choices=constants.DIMENSION_TYPES)
+    tipe = models.IntegerField(
+        _('type'), 
+        choices=TYPE_CHOICES,
+        default=TYPE_CHOICES.DIMENSION
+    )
 
-    class Meta(common.Component.Meta):
+    class Meta(common.AbstractComponent.Meta):
         abstract = True
+        verbose_name = 'Dimension'
+        verbose_name_plural = 'Dimensions'
 
-class AbstractGroupDimension(common.AnnotableArtefact):
+class GroupDimension(common.Annotable):
 
-    wrapper = models.ForeignKey(
-        'Group', on_delete=models.CASCADE)
-    dimension_reference = models.ForeignKey('Dimension', on_delete=models.CASCADE)
+    container = models.ForeignKey(
+        'Group', 
+        on_delete=models.CASCADE,
+        verbose_name=_('Group')
+    )
+    dimension_reference = models.ForeignKey(
+        'Dimension', 
+        on_delete=models.CASCADE,
+        verbose_name=_('Dimension')
+    )
 
-    class Meta(common.AnnotableArtefact.Meta):
+    class Meta:
         abstract = True
-        unique_together = ('wrapper', 'dimension_reference')
-        indexes = [
-            models.Index(fields=['wrapper']),
-            models.Index(fields=['dimension_reference']),
-            models.Index(fields=['wrapper', 'dimension_reference']),
+        constraints = [
+            models.UniqueConstraint(
+                fields=['container', 'dimension_reference'],
+                name='unique_group_dimension'
+            )
         ]
+        indexes = [
+            models.Index(fields=['container', 'dimension_reference']),
+        ]
+        verbose_name = _('Group dimension')
+        verbose_name_plural = _('Group dimensions')
 
-class AbstractPrimaryMeasure(common.Component):
+class PrimaryMeasure(common.AbstractComponent):
 
-    wrapper = models.ForeignKey(
-        'PrimaryMeasure', on_delete=models.CASCADE)
+    container = models.ForeignKey(
+        'MeasureList', 
+        on_delete=models.CASCADE,
+        verbose_name=_('Measure list')
+    )
     concept_identity = models.ForeignKey(
-        'conceptscheme.Concept', on_delete=models.CASCADE)
+        'conceptscheme.ConceptReference',
+        on_delete=models.PROTECT,
+        verbose_name=_('Concept identity')
+    )
     local_representation = models.ForeignKey(
-        'common.Representation', on_delete=models.CASCADE)
+        'common.Representation', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Local representation')
+    )
 
-    class Meta(common.Component.Meta):
+    class Meta(common.AbstractComponent.Meta):
         abstract = True
+        verbose_name = _('Primary measure')
+        verbose_name_plural = _('Primary measures')
 
-class AbstractAttribute(common.Component):
-
-    wrapper = models.ForeignKey(
-        'AttributeList', on_delete=models.CASCADE)
+class Attribute(common.AbstractComponent):
+    ASSIGNMENT_STATUS_CHOICES = Choices(
+        (0, 'MANDATORY', 'Mandatory'),
+        (1, 'CONDITIONAL', 'Conditional')
+    )
+    container = models.ForeignKey(
+        'AttributeList', 
+        on_delete=models.CASCADE,
+        verbose_name=_('Attribute list')
+    )
     concept_identity = models.ForeignKey(
-        'conceptscheme.Concept', on_delete=models.CASCADE,
+        'conceptscheme.ConceptReference',
+        on_delete=models.PROTECT,
         related_name='attribute_concept_identity_set',
-        related_query_name='attribute_concept_identity')
+        related_query_name='attribute_concept_identity',
+        verbose_name=_('Concept identity')
+    )
     local_representation = models.ForeignKey(
-        'common.Representation', on_delete=models.CASCADE)
+        'common.Representation', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Local represenation')
+    )
     concept_role = models.ManyToManyField(
-        'conceptscheme.Concept', related_name='attribute_concept_role_set',
-        related_query_name='attribute_concept_role')
-    assignment_status = models.CharField(
-        max_length=SMALL, choices=constants.ASSIGNMENT_STATUS)
+        'conceptscheme.ConceptReference', 
+        related_name='attribute_concept_role_set',
+        related_query_name='attribute_concept_role',
+        verbose_name=_('Concept roles')
+    )
+    assignment_status = models.IntegerField(
+        _('Assignment status'),
+        choices=ASSIGNMENT_STATUS_CHOICES
+    )
 
-    class Meta(common.Component.Meta):
+    class Meta(common.AbstractComponent.Meta):
         abstract = True
+        verbose_name = 'Attribute'
+        verbose_name_plural = 'Attributes'
 
-class AbstractAttributeRelationship(models.Model):
-    attribute = models.OneToOneField('Attribute', on_delete=models.CASCADE)
-    null = models.BooleanField(default=False)
-    dimension = models.ManyToManyField('Dimension', related_name='+')
-    attachment_group = models.ManyToManyField('Group', related_name='+')
+class AttributeRelationship(models.Model):
+    attribute = models.OneToOneField(
+        'Attribute', 
+        on_delete=models.CASCADE,
+        verbose_name=_('Attribute')
+    )
+    null = models.BooleanField(
+        _('Null'), 
+        default=False
+    )
+    dimension = models.ManyToManyField(
+        'Dimension', 
+        related_name='+',
+        verbose_name=_('Dimensions')
+    )
+    attachment_group = models.ManyToManyField(
+        'Group', 
+        related_name='+',
+        verbose_name=_('Groups')
+    )
     group = models.ForeignKey(
-        'Group', on_delete=models.CASCADE, related_name='+')
-    primary_measure = models.BooleanField(default=False)
+        'Group', 
+        on_delete=models.CASCADE, 
+        related_name='+',
+        verbose_name=_('Group')
+    )
+    primary_measure = models.BooleanField(
+        _('Primary measure'),
+        default=False
+    )
 
     class Meta:
         abstract = True
-        indexes = [
-            models.Index(fields=['attribute']),
-        ]
 
-class AbstractDataflow(common.MaintainableArtefact):
-    content_constraint = models.ManyToManyField('registry.ContentConstraint')
-    structure = models.ForeignKey('DataStructure', on_delete=models.CASCADE)
-
+class DataflowReference(common.AbstractReference):
     class Meta:
         abstract = True
+        verbose_name = _('Dataflow reference')
+        verbose_name_plural = _('Dataflow references')
+
+class Dataflow(common.AbstractMaintainable):
+    content_constraint = models.ForeignKey(
+        'registry.ContentConstraintReference',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_('Content constraint reference')
+    )
+    structure = models.ForeignKey(
+        'DataStructureReference', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Data structure reference')
+    )
+
+    class Meta(common.AbstractMaintainable.Meta):
+        abstract = True
+        verbose_name = _('Dataflow')
+        verbose_name_plural = _('Dataflows')
