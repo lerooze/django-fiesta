@@ -1,1 +1,1 @@
-from structure import *
+from .structure import *

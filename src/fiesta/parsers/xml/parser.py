@@ -16,8 +16,7 @@ from ...settings import api_settings
 from ...utils.coders import decode 
 from ...core import constants
 from ...core.exceptions import NotImplementedError, ParseSerializeError
-
-from .schema import Schema21
+from ...core.schema import Schema21
 
 class XMLParser(BaseParser):
     """

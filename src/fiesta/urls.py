@@ -1,6 +1,6 @@
+# urls.py
 
-
-from django.urls import path, register_converter, include
+from django.urls import path, register_converter
 from fiesta import converters 
 from fiesta.views import views
 from rest_framework.urlpatterns import format_suffix_patterns
@@ -28,6 +28,3 @@ urlpatterns = [
 
 urlpatterns = format_suffix_patterns(urlpatterns)
 
-urlpatterns += [
-    path('api-auth/', include('rest_framework.urls'))
-]

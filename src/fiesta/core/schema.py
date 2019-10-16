@@ -3,7 +3,7 @@ from lxml import etree
 from rest_framework.exceptions import ParseError
 
 from ..settings import api_settings
-from ...core.exceptions import NotImplementedError
+from .exceptions import NotImplementedError
 
 class Schema:
 

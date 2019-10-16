@@ -1,6 +1,6 @@
 from fiesta.apps.registry.abstract_models import (
     Log, SubmitStructureRequest, SubmittedStructure, StatusMessage,
-    StatusMessageText, Header, Party, Contact, Telephone, Fax, X400, Email,
+    ErrorCode, Header, Structure, Party, Contact, Telephone, Fax, X400, Email,
     URI, ProvisionAgreementReference, ProvisionAgreement,
     AttachmentConstraintReference, AttachmentConstraint,
     ContentConstraintReference, ContentConstraint, KeySet, Key, SubKey,
@@ -35,17 +35,23 @@ if not is_model_registered('registry', 'StatusMessage'):
 
     __all__.append('StatusMessage')
 
-if not is_model_registered('registry', 'StatusMessageText'):
-    class StatusMessageText(StatusMessageText):
+if not is_model_registered('registry', 'ErrorCode'):
+    class ErrorCode(ErrorCode):
         pass
 
-    __all__.append('StatusMessageText')
+    __all__.append('ErrorCode')
 
 if not is_model_registered('registry', 'Header'):
     class Header(Header):
         pass
 
     __all__.append('Header')
+
+if not is_model_registered('registry', 'Structure'):
+    class Structure(Structure):
+        pass
+
+    __all__.append('Structure')
 
 if not is_model_registered('registry', 'Party'):
     class Party(Party):

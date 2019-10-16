@@ -10,10 +10,16 @@ from ...core.validators import re_validators
 
 from ..common import abstract_models as common
 
-SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
-TINY = api_settings.DEFAULT_TINY_STRING_LENGTH
-LARGE = api_settings.DEFAULT_LARGE_STRING_LENGTH
-REGULAR = api_settings.DEFAULT_STRING_LENGTH
+VERY_SMALL = api_settings.DEFAULT_VERY_SMALL_STRING
+SMALL = api_settings.DEFAULT_SMALL_STRING
+MEDIUM = api_settings.DEFAULT_MEDIUM_STRING
+TINY = api_settings.DEFAULT_TINY_STRING
+
+ACTION_CHOICES = Choices(
+    (0, 'APPEND', 'Append'),
+    (1, 'REPLACE', 'Replace'),
+    (2, 'DELETE', 'Delete'),
+)
 
 class Log(models.Model):
     CHANNEL_CHOICES = Choices(
@@ -35,10 +41,12 @@ class Log(models.Model):
         on_delete=models.PROTECT,
         verbose_name = _('User')
     )
-    channel = models.CharField(
+    channel = models.IntegerField(
         _('Channel'),
-        max_length=SMALL, 
         choices=CHANNEL_CHOICES,
+        null=False,
+        blank=False,
+        editable=False
     )
     created = models.DateTimeField(
         _('Created'), 
@@ -83,20 +91,15 @@ class Log(models.Model):
         self.save()
 
 class SubmitStructureRequest(models.Model):
-    ACTION_CHOICES = Choices(
-        (0, 'APPEND', 'Append'),
-        (1, 'REPLACE', 'Replace'),
-        (2, 'DELETE', 'Delete'),
-    )
     header = models.OneToOneField(
-        'common.Header', 
+        'registry.Header', 
         on_delete=models.PROTECT,
         verbose_name=_('Header')
     )
     action = models.IntegerField(
         _('Action'),
         choices=ACTION_CHOICES, 
-        default=ACTION_CHOICES.APPEND
+        default=0
     )
     structure_location = models.URLField(
         _('Structure location'), 
@@ -130,7 +133,7 @@ class SubmittedStructure(models.Model):
     action = models.IntegerField(
         _('Action'),
         choices=ACTION_CHOICES, 
-        default=ACTION_CHOICES.APPEND
+        default=0
     )
     external_dependencies = models.BooleanField(
         _('External dependencies'),
@@ -158,44 +161,123 @@ class StatusMessage(models.Model):
         _('Status'), 
         choices=STATUS_CHOICES
     )
-    message_text = models.ManyToManyField(
-        'StatusMessageText',
-        verbose_name=_('Message text')
-    )
 
     class Meta:
         abstract = True
         verbose_name = _('Status message')
         verbose_name_plural = _('Status messages')
 
-class StatusMessageText(models.Model):
-    code = models.CharField(
-        _('ID'), 
-        max_length=SMALL, 
-        validators=[re_validators['IDType']], 
-        blank=True)
+class ErrorCode(models.Model):
+    # TODO complete ERROR_CODE_CHOICES
+    ERROR_CODE_CHOICES = Choices(
+        (1001, 'FIESTA_1001_HEADER_ORGANISATION_NOT_REGISTERED'),
+        (1002, 'FIESTA_1002_HEADER_CONTACT_EMAIL_NOT_FOUND'),
+    )
+    status_message = models.ForeignKey(
+        'registry.StatusMessage',
+        on_delete=models.CASCADE,
+        verbose_name=_('Status message')
+    )
+    code = models.IntegerField(
+        _('Error code'), 
+        choices=ERROR_CODE_CHOICES
+    )
 
     class Meta:
         abstract = True
-        verbose_name = _('Status message text')
-        verbose_name_plural = _('Status message texts')
+        verbose_name = _('Error code')
+        verbose_name_plural = _('Error codes')
 
 class Header(models.Model):
-    log = models.OneToOneField('registry.Log', on_delete=models.PROTECT)
+    log = models.OneToOneField(
+        'registry.Log', 
+        on_delete=models.PROTECT,
+        verbose_name=_('Log'),
+        editable=False
+    )
     object_id = models.CharField(
-        'ID', max_length=SMALL, validators=[re_validators['IDType']],
-        editable=False)
-    test = models.BooleanField(default=False)
-    prepared = models.DateTimeField(null=True, blank=True, editable=False)
+        _('ID'), 
+        max_length=SMALL, 
+        validators=[re_validators['IDType']],
+    )
+    test = models.BooleanField(
+        _('Test'),
+        default=False,
+    )
+    prepared = models.DateTimeField(
+        _('Prepared'),
+        null=True, 
+        blank=True, 
+    )
     sender = models.OneToOneField(
         'registry.Party', 
+        verbose_name=_('Sender'),
         on_delete=models.PROTECT, 
-        editable=False, 
+        related_name='+',
     )
     receiver = models.OneToOneField(
         'registry.Party', 
+        verbose_name=_('Receiver'),
         on_delete=models.PROTECT, 
-        editable=False, 
+        related_name='+',
+    )
+    name = models.CharField(
+        _('Transmission name'),
+        max_length=MEDIUM,
+        null=False,
+    )
+    structure = models.OneToOneField(
+        'registry.Structure',
+        on_delete=models.PROTECT,
+        verbose_name=_('Structure'),
+        null=True,
+        blank=True
+    )
+    data_provider = models.ForeignKey(
+        'base.DataProvider',
+        verbose_name=_('Data provider'),
+        on_delete=models.PROTECT,
+        null=True,
+    )
+    data_set_action = models.IntegerField(
+        _('Data set action'),
+        choices=ACTION_CHOICES, 
+        null=True,
+        blank=True
+    )
+    data_set_id = models.CharField(
+        _('Data set ID'),
+        max_length=SMALL,
+        blank=True
+    )
+    extracted = models.DateTimeField(
+        _('Prepared'),
+        null=True, 
+        blank=True, 
+    )
+    extracted = models.DateTimeField(
+        _('Extracted'), 
+        auto_now=True,
+    )
+    reporting_begin = models.CharField(
+        _('Reporting begin'),
+        max_length=MEDIUM,
+        blank=True
+    )
+    reporting_end = models.CharField(
+        _('Reporting end'),
+        max_length=MEDIUM,
+        blank=True
+    )
+    embargo_date = models.DateTimeField(
+        _('Embargo date'),
+        null=True,
+        blank=True
+    )
+    source = models.CharField(
+        _('Source'),
+        max_length=SMALL,
+        blank=True
     )
 
     def __str__(self):
@@ -207,7 +289,50 @@ class Header(models.Model):
         verbose_name = _('Header')
         verbose_name_plural = _('Headers')
 
-class Party(common.AbstractNameable, common.AbstractContactMixin):
+class Structure(models.Model):
+    structure_id = models.CharField(
+        _('Structure ID'),
+        max_length=SMALL,
+        null=False,
+        blank=False
+    )
+    schema_url = models.URLField(
+        _('Schema URL'),
+        null=False,
+        blank=True
+    )
+    namespace = models.CharField(
+        _('Namespace'),
+        max_length=MEDIUM,
+        null=False,
+        blank=True
+    )
+    dimension_at_observation = models.CharField(
+        _('Observation dimension'),
+        max_length=VERY_SMALL,
+        null=False,
+        blank=True
+    )
+    explicit_measures = models.BooleanField(
+        _('Explicit measures'),
+        null=True,
+        blank=True
+    )
+    service_url = models.URLField(
+        _('Service URL'),
+        null=True,
+        blank=True
+    )
+    structure_url = models.URLField(
+        _('Structure URL'),
+        null=True,
+        blank=True
+    )
+
+    class Meta:
+        abstract = True
+
+class Party(common.AbstractNameable):
     object_id = models.CharField(
         _('ID'), 
         max_length=SMALL, 
@@ -216,7 +341,7 @@ class Party(common.AbstractNameable, common.AbstractContactMixin):
     )
     timezone = models.CharField(max_length=SMALL, blank=True)
 
-    class Meta(common.AbstractItem.Meta):
+    class Meta(common.AbstractNameable.Meta):
         abstract = True
         verbose_name = _('Party')
         verbose_name_plural = _('Parties')
@@ -225,8 +350,11 @@ class Contact(common.AbstractContact):
     party = models.ForeignKey(
         'registry.Party',
         on_delete=models.CASCADE,
-        verobse_name=_('Party')
+        verbose_name=_('Party')
     )
+
+    class Meta(common.AbstractContact.Meta):
+        abstract = True
 
 class AbstractContactInfo(models.Model):
     contact = models.ForeignKey(
@@ -369,9 +497,9 @@ class AttachmentConstraintReference(common.AbstractReference):
         verbose_name = _('Attachment constraint reference')
         verbose_name_plural = _('Attachment constraint references')
 
-class AttachmentConstraint(common.Maintainable):
+class AttachmentConstraint(common.AbstractMaintainable):
 
-    class Meta(common.Maintainable.Meta):
+    class Meta(common.AbstractMaintainable.Meta):
         abstract = True
         verbose_name = _('Attachment constraint')
         verbose_name_plural = _('Attachment constraints')
@@ -382,30 +510,30 @@ class ContentConstraintReference(common.AbstractReference):
         verbose_name = _('Content constraint reference')
         verbose_name_plural = _('Content constraint references')
 
-class ContentConstraint(common.Maintainable):
-    TYPE_CHOICES = (
+class ContentConstraint(common.AbstractMaintainable):
+    TYPE_CHOICES = Choices(
         (0, 'ACTUAL', 'Actual'),
         (1, 'ALLOWED', 'Allowed'),
     )
-    release_calendar = models.ForeignField(
+    release_calendar = models.ForeignKey(
         'registry.ReleaseCalendar',
         on_delete=models.CASCADE,
         verbose_name=_('Release calendar'),
         null=True
     )
-    reference_period = models.ForeignField(
+    reference_period = models.ForeignKey(
         'common.ReferencePeriod',
         on_delete=models.CASCADE,
         verbose_name=_('Reference period'),
         null=True
     )
-    tipe = models.models.IntegerField(
+    tipe = models.IntegerField(
         _('type'), 
         choices=TYPE_CHOICES,
         default=TYPE_CHOICES.ACTUAL
     )
 
-    class Meta(common.Maintainable.Meta):
+    class Meta(common.AbstractMaintainable.Meta):
         abstract = True
         verbose_name = _('Content constraint')
         verbose_name_plural = _('Content constraints')
@@ -418,7 +546,7 @@ class AbstractRegion(models.Model):
         verbose_name=_('Attachment constraint')
     )
     content_constraint = models.ForeignKey(
-        'registy.ContentConstraint', 
+        'registry.ContentConstraint', 
         on_delete=models.CASCADE, 
         null=True,
         verbose_name=_('Content constraint')
@@ -479,6 +607,7 @@ class CubeRegion(AbstractRegion):
 class CubeRegionKey(models.Model):
     cube_region = models.ForeignKey(
         'CubeRegion',
+        on_delete=models.CASCADE,
         verbose_name=_('Cube region')
     )
     component_id = models.CharField(
@@ -494,6 +623,7 @@ class CubeRegionKey(models.Model):
 class CubeRegionKeyValue(models.Model):
     cube_region_key = models.ForeignKey(
         'CubeRegionKey',
+        on_delete=models.CASCADE,
         verbose_name=_('Cube region key')
     )
     cascade_values = models.BooleanField(
@@ -514,26 +644,35 @@ class CubeRegionKeyValue(models.Model):
 class CubeRegionKeyTimeRange(models.Model):
     cube_region_key = models.ForeignKey(
         'CubeRegionKey',
+        on_delete=models.CASCADE,
         verbose_name=_('Cube region key')
     )
     before_period = models.ForeignKey(
         'TimePeriod', 
+        on_delete=models.CASCADE,
         verbose_name=_('Before period'),
+        related_name='+',
         null=True
     )
     after_period = models.ForeignKey(
         'TimePeriod',
+        on_delete=models.CASCADE,
         verbose_name=_('After period'),
+        related_name='+',
         null=True
     )
     start_period = models.ForeignKey(
         'TimePeriod', 
+        on_delete=models.CASCADE,
         verbose_name=_('Start period'),
+        related_name='+',
         null=True,
     )
     end_period = models.ForeignKey(
         'TimePeriod', 
+        on_delete=models.CASCADE,
         verbose_name=_('End period'),
+        related_name='+',
         null=True
     )
 

@@ -8,7 +8,7 @@ from lxml.etree import tostring
 from lxml import etree
 from typing import Iterable
 
-from fiesta.utils.schema import Schema
+from ...core.schema import Schema
 
 from ...utils.coders import encode
 from ...core.serializers.base import Serializer

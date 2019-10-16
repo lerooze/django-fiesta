@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
+from model_utils import Choices
 from treebeard.mp_tree import MP_Node
 
 from ...settings import api_settings 
@@ -13,13 +14,13 @@ from . import managers
 
 VERY_SMALL = api_settings.DEFAULT_VERY_SMALL_STRING
 SMALL = api_settings.DEFAULT_SMALL_STRING
-MEDIUM = api_settings.DEFAULT_REGULAR_STRING
+MEDIUM = api_settings.DEFAULT_MEDIUM_STRING
 VERY_LARGE = api_settings.DEFAULT_VERY_LARGE_STRING
 
 class SmallString(models.Model):
     text = models.CharField(
         max_length=SMALL,
-        unique=True
+        unique=True,
     )
 
     class Meta:
@@ -77,16 +78,16 @@ class Annotation(models.Model):
     def __str__(self):
         return '%s:%s:%s' % (self.object_id, self.annotation_title, self.annotation_type)
 
-class AbstractAnnotatable(models.Model):
+class AbstractAnnotable(models.Model):
     annotations = models.ManyToManyField(
-        'Annotation',
+        'common.Annotation',
         verbose_name=_('Annotations'),
         related_name='+',
     )
     class Meta:
         abstract = True
 
-class AbstractIdentifiable(AbstractAnnotatable):
+class AbstractIdentifiable(AbstractAnnotable):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -98,7 +99,7 @@ class AbstractIdentifiable(AbstractAnnotatable):
     class Meta:
         abstract = True
 
-class AbstractNCNameIdentifiable(AbstractIdentifiable):
+class AbstractNCNameIdentifiable(AbstractAnnotable):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -110,7 +111,7 @@ class AbstractNCNameIdentifiable(AbstractIdentifiable):
     class Meta:
         abstract = True
 
-class AbstractNestedNCNameIdentifiable(AbstractIdentifiable):
+class AbstractNestedNCNameIdentifiable(AbstractAnnotable):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -137,28 +138,48 @@ class AbstractNameable(AbstractIdentifiable):
     class Meta:
         abstract = True
 
-class AbstractNCNameNameable(AbstractNCNameIdentifiable, AbstractNameable):
+class AbstractNCNameNameable(AbstractNCNameIdentifiable):
+    name = models.CharField(
+        _('Name'),
+        max_length=MEDIUM,
+        blank=True
+    )
+    description = models.CharField(
+        _('Description'),
+        max_length=VERY_LARGE,
+        blank=True
+    )
 
     class Meta:
         abstract = True
 
-class AbstractNestedNCNameNameable(AbstractNestedNCNameIdentifiable, AbstractNameable):
+class AbstractNestedNCNameNameable(AbstractNestedNCNameIdentifiable):
+    name = models.CharField(
+        _('Name'),
+        max_length=MEDIUM,
+        blank=True
+    )
+    description = models.CharField(
+        _('Description'),
+        max_length=VERY_LARGE,
+        blank=True
+    )
 
     class Meta:
         abstract = True
 
 class AbstractVersionable(AbstractNameable):
-    major_version = models.IntegerField(
+    major = models.IntegerField(
         _('Major version'), 
         default=1, 
         db_index=True
     )
-    minor_version = models.IntegerField(
+    minor = models.IntegerField(
         _('Minor version'), 
         default=0, 
         db_index=True
     )
-    patch_version = models.IntegerField(
+    patch = models.IntegerField(
         _('Patch version'), 
         null=True, 
         db_index=True
@@ -171,6 +192,9 @@ class AbstractVersionable(AbstractNameable):
         _('Valid to'),
         null=True,
         blank=True)
+
+    class Meta:
+        abstract = True
 
 class AbstractNCNameVersionable(AbstractNCNameNameable, AbstractVersionable):
 
@@ -206,7 +230,7 @@ class AbstractMaintainable(AbstractVersionable):
     class Meta:
         abstract = True
         ordering = ['agency', 'object_id', '-major', '-minor', '-patch']
-        constraint = [
+        constraints = [
             models.UniqueConstraint(
                 fields=['agency', 'object_id', 'major', 'minor', 'patch'],
                 name='unique_maintainable'
@@ -264,7 +288,7 @@ class AbstractItem(AbstractNameable):
     class Meta:
         abstract = True
         ordering = ['container', 'object_id']
-        constraint = [
+        constraints = [
             models.UniqueConstraint(
                 fields=['container', 'object_id'],
                 name='unique_item'
@@ -289,7 +313,7 @@ class AbstractNCNameItem(AbstractItem):
         db_index=True
     )
 
-    class Meta(AbstractItem.meta):
+    class Meta(AbstractItem.Meta):
         abstract = True
 
 class AbstractNestedNCNameItem(AbstractItem):
@@ -300,7 +324,7 @@ class AbstractNestedNCNameItem(AbstractItem):
         db_index=True
     )
 
-    class Meta(AbstractItem.meta):
+    class Meta(AbstractItem.Meta):
         abstract = True
 
 class AbstractItemWithParent(AbstractItem, MP_Node):
@@ -336,7 +360,7 @@ class AbstractNCNameItemWithParent(AbstractItemWithParent):
         db_index=True
     )
 
-    class Meta(AbstractItem.meta):
+    class Meta(AbstractItem.Meta):
         abstract = True
 
 class AbstractNestedNCNameItemWithParent(AbstractItemWithParent):
@@ -347,7 +371,7 @@ class AbstractNestedNCNameItemWithParent(AbstractItemWithParent):
         db_index=True
     )
 
-    class Meta(AbstractItem.meta):
+    class Meta(AbstractItem.Meta):
         abstract = True
 
 class AbstractNestedNCNameUniqueIdentifiableWithParent(AbstractIdentifiable):
@@ -439,7 +463,7 @@ class AbstractNestedNCNameItemReference(AbstractReference):
 
 
 class Format(models.Model):
-    DATA_TYPE_CHOICES = ( 
+    DATA_TYPE_CHOICES = Choices( 
         (0, 'STRING', 'String'),
         (1, 'ALPHA', 'Alpha'),
         (2, 'ALPHANUMERIC', 'AlphaNumeric'),
@@ -622,7 +646,7 @@ class AbstractComponent(AbstractNCNameIdentifiable):
 
     class Meta:
         abstract = True
-        constraint = [
+        constraints = [
             models.UniqueConstraint(
                 fields=['container', 'concept_identity', 'object_id'],
                 name='unique_component'
@@ -652,7 +676,7 @@ class AbstractContact(models.Model):
     name = models.CharField(
         max_length=SMALL,
         verbose_name=_('Name'))
-    derartment = models.CharField(
+    department = models.CharField(
         max_length=SMALL,
         verbose_name=_('Department'))
     role = models.CharField(

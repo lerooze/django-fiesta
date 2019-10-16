@@ -1,7 +1,7 @@
 # translation.py
 
 from modeltranslation.translator import translator, TranslationOptions
-from .models import Annotation, Contact
+from .models import Annotation
 
 class NameableTranslation(TranslationOptions):
     fields = ['name', 'description'] 
@@ -12,4 +12,4 @@ class AnnotationTranslation(TranslationOptions):
 class ContactTranslation(TranslationOptions):
     fields = ['name', 'department', 'role'] 
 
-translator.register([Annotation, Contact])
+translator.register(Annotation, AnnotationTranslation)

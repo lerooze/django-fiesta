@@ -1,7 +1,6 @@
 # structure.py
 
 import functools
-import import_module
 import lxml 
 
 from dataclasses import asdict
@@ -13,8 +12,8 @@ from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 from django.db.models import Q
 from django.utils import translation
+from importlib import import_module
 from lxml.etree import QName
-from rest_framework.exceptions import ParseError 
 from typing import Iterable
 
 from .. import status, constants, patterns
@@ -34,7 +33,7 @@ class ReferencePeriodSerializer(CommonSerializer):
     end_time: datetime = field()
 
     class Meta:
-        package = 'common'
+        app_name = 'common'
         model_name = 'referenceperiod'
         namespace_key = 'common'
 
@@ -67,9 +66,9 @@ class ValueSerializer(StringSerializer):
 class TextSerializer(StringSerializer):
     lang: str = field(is_attribute=True, namespace_key='xml', default='en')
 
-    class Meta:
-        app_name = 'common'
-        model_name = 'text'
+    # class Meta:
+    #     app_name = 'common'
+    #     model_name = 'text'
 
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(*args, **kwargs)
@@ -203,34 +202,39 @@ class SimpleStringContactSerializer(SimpleStringSerializer):
         )
 
 class TelephoneSerializer(SimpleStringContactSerializer):
+    pass
 
-    class Meta:
-        app_name = 'base'
-        model_name = 'telephone'
+    # class Meta:
+    #     app_name = 'base'
+    #     model_name = 'telephone'
 
 class FaxSerializer(SimpleStringContactSerializer):
+    pass
 
-    class Meta:
-        app_name = 'base'
-        model_name = 'fax'
+    # class Meta:
+    #     app_name = 'base'
+    #     model_name = 'fax'
 
 class X400Serializer(SimpleStringContactSerializer):
+    pass
 
-    class Meta:
-        app_name = 'base'
-        model_name = 'x400'
+    # class Meta:
+    #     app_name = 'base'
+    #     model_name = 'x400'
 
 class URISerializer(SimpleStringContactSerializer):
+    pass
 
-    class Meta:
-        app_name = 'base'
-        model_name = 'uri'
+    # class Meta:
+    #     app_name = 'base'
+    #     model_name = 'uri'
 
 class EmailSerializer(SimpleStringContactSerializer):
+    pass
 
-    class Meta:
-        app_name = 'base'
-        model_name = 'email'
+    # class Meta:
+    #     app_name = 'base'
+    #     model_name = 'email'
 
 class BaseContactSerializer(Serializer):
 
@@ -244,8 +248,8 @@ class BaseContactSerializer(Serializer):
     email: Iterable[EmailSerializer] = field()
 
     class Meta:
-        app_name = 'base'
-        model_name = 'Contact'
+        # app_name = 'base'
+        # model_name = 'Contact'
         namespace_key = 'message'
 
     def get_item_set(self, related_name):
@@ -314,8 +318,8 @@ class PartySerializer(Serializer):
     object_id: str = field(is_attribute=True, localname='id')
 
     class Meta:
-        app_name = 'base'
-        model_name = 'Organisation'
+        # app_name = 'base'
+        # model_name = 'Organisation'
         namespace_key = 'message'
 
     def process_prevalidate(self):
@@ -382,7 +386,7 @@ class HeaderSerializer(Serializer):
 
     class Meta:
         app_name = 'registry'
-        model_name = 'Submission'
+        model_name = 'Header'
         namespace_key = 'message'
 
     def _header_to_bogus_reference(self):
@@ -767,8 +771,8 @@ class OrganisationSerializer(ManyToManyItemSerializer):
     contact: Iterable[ContactSerializer] = field()
 
     class Meta:
-        app_name = 'base'
-        model_name = 'organisation'
+        # app_name = 'base'
+        # model_name = 'organisation'
         namespace_key = 'structure'
 
 class AgencySerializer(OrganisationSerializer):
@@ -786,8 +790,8 @@ class OrganisationUnitSerializer(OrganisationSerializer):
 class OrganisationSchemeSerializer(ItemSchemeSerializer):
 
     class Meta:
-        app_name = 'base'
-        model_name = 'organisationscheme'
+        # app_name = 'base'
+        # model_name = 'organisationscheme'
         namespace_key = 'structure'
         structures_field_name = 'organisation_schemes'
 
@@ -821,11 +825,11 @@ class DataProviderSchemeSerializer(OrganisationSchemeSerializer):
     data_provider: Iterable[DataProviderSerializer] = field(namespace_key='structure') 
 
     class Meta:
-        app_name = 'base'
-        model_name = 'organisationscheme'
+        # app_name = 'base'
+        # model_name = 'organisationscheme'
         namespace_key = 'structure'
         structures_field_name = 'organisation_schemes'
-        parent_names = ['ProvisionAgreementSerializer', 'ContentConstraintSerializer']
+        parents_names = ['ProvisionAgreementSerializer', 'ContentConstraintSerializer']
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -878,7 +882,7 @@ class CodelistSerializer(ItemSchemeSerializer):
         model_name = 'codelist'
         namespace_key = 'structure'
         structures_field_name = 'codelists'
-        parent_names = ['ConceptSchemeSerializer', 'DataStructureSerializer']
+        parents_names = ['ConceptSchemeSerializer', 'DataStructureSerializer']
 
     @classmethod
     def make_related_query(cls, related_cls, context):
@@ -916,7 +920,7 @@ class FormatSerializer(Serializer):
    
     class Meta:
         app_name ='common'
-        model_name = 'format'
+        # model_name = 'format'
 
     def process_premake(self):
         obj, _ = self._meta.model.objects.get_or_create(
@@ -931,7 +935,7 @@ class RepresentationSerializer(Serializer):
 
     class Meta:
         app_name ='common' 
-        model_name = 'representation'
+        # model_name = 'representation'
         namespace_key = 'common'
 
             
@@ -992,7 +996,7 @@ class ConceptSchemeSerializer(ItemSchemeSerializer):
         model_name = 'conceptscheme'
         namespace_key = 'structure'
         children_names = 'CodelistSerializer'
-        parent_names = ['DataStructureSerializer']
+        parents_names = ['DataStructureSerializer']
         structures_field_name = 'concepts'
 
     @classmethod
@@ -1249,7 +1253,7 @@ class DataStructureSerializer(MaintainableSerializer):
         model_name = 'datastructure'
         namespace_key = 'structure'
         children_names = ['ConceptSchemeSerializer, CodelistSerializer']
-        parent_names = ['DataflowSerializer', 'AttachmentConstraintSerializer']
+        parents_names = ['DataflowSerializer', 'AttachmentConstraintSerializer']
         structures_field_name = 'datastructures'
 
     def expose_group(self):
@@ -1322,7 +1326,7 @@ class DataflowSerializer(MaintainableSerializer):
         model_name = 'dataflow'
         namespace_key = 'structure'
         children_names = 'DataStructureSerializer'
-        parent_names = 'ContentConstraintSerializer'
+        parents_names = 'ContentConstraintSerializer'
         structures_field_name = 'dataflows'
 
     def __post_init__(self, *args, **kwargs):
@@ -1359,7 +1363,7 @@ class ProvisionAgreementSerializer(MaintainableSerializer):
         model_name = 'provisionagreement'
         namespace_key = 'structure'
         children_names = ['DataflowSerializer', 'DataProviderSchemeSerializer']
-        parent_names = 'ContentConstraintSerializer'
+        parents_names = 'ContentConstraintSerializer'
         structures_field_name = 'provision_agreements'
 
     def __post_init__(self, *args, **kwargs):
@@ -1415,12 +1419,12 @@ class ContentConstraintAttachmentSerializer(BaseStructureSerializer):
     #TODO Most likely will never implement content constraints attached to Queryable artefacts since SOAP web service is not implemented
 
     data_provider: ReferenceSerializer = field()
-    data_structure = Iterable[ReferenceSerializer] = field()
-    dataflow = Iterable[ReferenceSerializer] = field()
-    provision_agreement = Iterable[ReferenceSerializer] = field()
+    data_structure: Iterable[ReferenceSerializer] = field()
+    dataflow: Iterable[ReferenceSerializer] = field()
+    provision_agreement: Iterable[ReferenceSerializer] = field()
 
     class Meta:
-        namespace = 'structure'
+        namespace_key = 'structure'
 
     def process_postmake(self, obj):
         obj = super().postmake(obj)

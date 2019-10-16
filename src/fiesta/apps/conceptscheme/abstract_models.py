@@ -7,7 +7,7 @@ from ...settings import api_settings
 
 from ..common import abstract_models as common
 
-SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
+SMALL = api_settings.DEFAULT_SMALL_STRING
 
 class ConceptReference(common.AbstractNCNameItemReference):
 
@@ -48,7 +48,7 @@ class Concept(common.AbstractNCNameItemWithParent):
     class Meta(common.AbstractNCNameItemWithParent.Meta):
         abstract = True
 
-class AbstractISOConceptReference(models.Model):
+class ISOConceptReference(models.Model):
     concept_agency = models.CharField(
         _('Concept agency'),
         max_length=SMALL

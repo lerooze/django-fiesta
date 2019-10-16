@@ -26,7 +26,7 @@ class DataStructure(common.AbstractMaintainable):
     class Meta(common.AbstractMaintainable.Meta):
         abstract = True
 
-class AbstractComponentList(common.AbstractAnnotatable):
+class AbstractComponentList(common.AbstractAnnotable):
 
     data_structure = models.OneToOneField(
         'DataStructure', 
@@ -58,7 +58,7 @@ class Group(common.AbstractIdentifiable):
 
     class Meta:
         abstract = True
-        constraint = [
+        constraints = [
             models.UniqueConstraint(
                 fields=['data_structure', 'object_id'],
                 name='unique_group'
@@ -124,7 +124,7 @@ class Dimension(common.AbstractComponent):
         verbose_name = 'Dimension'
         verbose_name_plural = 'Dimensions'
 
-class GroupDimension(common.Annotable):
+class GroupDimension(common.AbstractAnnotable):
 
     container = models.ForeignKey(
         'Group', 

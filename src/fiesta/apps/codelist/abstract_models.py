@@ -3,11 +3,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from ...settings import api_settings
-
 from ..common import abstract_models as common 
-
-SMALL = api_settings.DEFAULT_SMALL_STRING_LENGTH
 
 class CodelistReference(common.AbstractReference):
 
@@ -27,10 +23,11 @@ class Code(common.AbstractItemWithParent):
 
     container = models.ForeignKey(
         'codelist.Codelist',
+        on_delete=models.CASCADE,
         verbose_name=_('Codelist')
     )
 
-    class Meta(common.ItemWithParent.Meta):
+    class Meta(common.AbstractItemWithParent.Meta):
         abstract = True
         verbose_name = _('Code')
         verbose_name_plural = _('Codes')

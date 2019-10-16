@@ -3,8 +3,8 @@
 from oscar.core.loading import is_model_registered
 
 from .abstract_models import (
-    SmallString, URLString, EmailString, Annotation, Format,
-    Representation, ReferencePeriod
+    SmallString, URLString, EmailString, Annotation, Format, Representation,
+    ReferencePeriod
 )
 
 __all__ = []
