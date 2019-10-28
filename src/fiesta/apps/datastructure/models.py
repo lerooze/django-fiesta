@@ -1,14 +1,20 @@
 # models.py
 
 from .abstract_models import (
-    DataStructureReference, DataStructure, DimensionList, Group, AttributeList,
-    MeasureList, Dimension, GroupDimension, PrimaryMeasure, Attribute,
-    AttributeRelationship, DataflowReference, Dataflow
+    Annotation, DataStructureReference, DataStructure, DimensionList, Group,
+    AttributeList, MeasureList, Dimension, GroupDimension, PrimaryMeasure,
+    Attribute, AttributeRelationship, DataflowReference, Dataflow
 )
 
-from oscar.core.loading import is_model_registered
+from ...core.loading import is_model_registered
 
 __all__ = []
+
+if not is_model_registered('datastructure', 'Annotation'):
+    class Annotation(Annotation):
+        pass
+
+    __all__.append('Annotation')
 
 if not is_model_registered('datastructure', 'DataStructureReference'):
     class DataStructureReference(DataStructureReference):

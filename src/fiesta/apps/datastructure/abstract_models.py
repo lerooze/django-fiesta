@@ -9,6 +9,80 @@ from ..common import abstract_models as common
 
 TINY = api_settings.DEFAULT_TINY_STRING
 
+class Annotation(common.Annotation):
+    data_structure = models.ForeignKey(
+        'datastructure.DataStructure',
+        on_delete=models.CASCADE,
+        verbose_name=_('Data structure'),
+        null=True,
+        blank=True,
+    )
+    dimension_list = models.ForeignKey(
+        'datastructure.DimensionList',
+        on_delete=models.CASCADE,
+        verbose_name=_('Dimension list'),
+        null=True,
+        blank=True,
+    )
+    group = models.ForeignKey(
+        'datastructure.Group',
+        on_delete=models.CASCADE,
+        verbose_name=_('Group'),
+        null=True,
+        blank=True,
+    )
+    attribute_list = models.ForeignKey(
+        'datastructure.AttributeList',
+        on_delete=models.CASCADE,
+        verbose_name=_('Attribute list'),
+        null=True,
+        blank=True,
+    )
+    measure_list = models.ForeignKey(
+        'datastructure.MeasureList',
+        on_delete=models.CASCADE,
+        verbose_name=_('Measure list'),
+        null=True,
+        blank=True,
+    )
+    dimension = models.ForeignKey(
+        'datastructure.Dimension',
+        on_delete=models.CASCADE,
+        verbose_name=_('Dimension'),
+        null=True,
+        blank=True,
+    )
+    group_dimension = models.ForeignKey(
+        'datastructure.GroupDimension',
+        on_delete=models.CASCADE,
+        verbose_name=_('Group dimension'),
+        null=True,
+        blank=True,
+    )
+    primary_measure = models.ForeignKey(
+        'datastructure.PrimaryMeasure',
+        on_delete=models.CASCADE,
+        verbose_name=_('Primary measure'),
+        null=True,
+        blank=True,
+    )
+    attribute = models.ForeignKey(
+        'datastructure.Attriubute',
+        on_delete=models.CASCADE,
+        verbose_name=_('Attribute'),
+        null=True,
+        blank=True,
+    )
+    dataflow = models.ForeignKey(
+        'datastructure.Dataflow',
+        on_delete=models.CASCADE,
+        verbose_name=_('Dataflow'),
+        null=True,
+        blank=True,
+    )
+    class Meta:
+        abstract = True
+
 class DataStructureReference(common.AbstractReference):
     class Meta:
         abstract = True
@@ -16,12 +90,6 @@ class DataStructureReference(common.AbstractReference):
         verbose_name_plural = _('Data structure references')
 
 class DataStructure(common.AbstractMaintainable):
-    content_constraint = models.ForeignKey(
-        'registry.ContentConstraintReference',
-        on_delete=models.SET_NULL,
-        null=True,
-        verbose_name=_('Content constraint reference')
-    )
 
     class Meta(common.AbstractMaintainable.Meta):
         abstract = True
@@ -108,8 +176,8 @@ class Dimension(common.AbstractComponent):
     )
     concept_role = models.ManyToManyField(
         'conceptscheme.ConceptReference', 
-        related_name='dimension_concept_role_set',
-        related_query_name='dimension_concept_role',
+        related_name='dimension_conceptrole_set',
+        related_query_name='dimension_conceptrole',
         verbose_name=_('Concept roles')
     )
     position = models.IntegerField(_('position'))
@@ -238,9 +306,10 @@ class AttributeRelationship(models.Model):
         related_name='+',
         verbose_name=_('Group')
     )
-    primary_measure = models.BooleanField(
-        _('Primary measure'),
-        default=False
+    primary_measure = models.ManyToManyField(
+        'PrimaryMeasure', 
+        related_name='+',
+        verbose_name=_('Primary measures')
     )
 
     class Meta:
@@ -253,12 +322,6 @@ class DataflowReference(common.AbstractReference):
         verbose_name_plural = _('Dataflow references')
 
 class Dataflow(common.AbstractMaintainable):
-    content_constraint = models.ForeignKey(
-        'registry.ContentConstraintReference',
-        on_delete=models.SET_NULL,
-        null=True,
-        verbose_name=_('Content constraint reference')
-    )
     structure = models.ForeignKey(
         'DataStructureReference', 
         on_delete=models.PROTECT,

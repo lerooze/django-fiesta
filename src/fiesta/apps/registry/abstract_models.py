@@ -33,8 +33,11 @@ class Log(models.Model):
         (7, 'REQUESTDATAREST', 'RequestDataREST'),
     )
     PROGRESS_CHOICES = Choices(
-        (0, 'PROCESSING', 'Processing'),
-        (1, 'FINISHED', 'Finished'),
+        (0, 'SUBMITTED', 'Submitted'),
+        (1, 'NEGOTIATING', 'Negotiating'),
+        (2, 'PARSING', 'Parsing'),
+        (3, 'PROCESSING', 'Processing'),
+        (4, 'COMPLETED', 'Completed'),
     )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, 
@@ -91,20 +94,21 @@ class Log(models.Model):
         self.save()
 
 class SubmitStructureRequest(models.Model):
+    ACTION_CHOICES = ACTION_CHOICES
     header = models.OneToOneField(
         'registry.Header', 
         on_delete=models.PROTECT,
-        verbose_name=_('Header')
-    )
-    action = models.IntegerField(
-        _('Action'),
-        choices=ACTION_CHOICES, 
-        default=0
+        verbose_name=_('Header'),
     )
     structure_location = models.URLField(
         _('Structure location'), 
         null=True,
         blank=True
+    )
+    action = models.IntegerField(
+        _('Action'),
+        choices=ACTION_CHOICES, 
+        default=0
     )
     external_dependencies = models.BooleanField(
         _('External dependencies'),
@@ -120,15 +124,11 @@ class SubmitStructureRequest(models.Model):
         verbose_name_plural = _('Submit structure requests')
 
 class SubmittedStructure(models.Model):
-    ACTION_CHOICES = Choices(
-        (0, 'APPEND', 'Append'),
-        (1, 'REPLACE', 'Replace'),
-        (2, 'DELETE', 'Delete'),
-    )
+    ACTION_CHOICES = ACTION_CHOICES
     submit_structure_request = models.ForeignKey(
-        'SubmitStructureRequest',
+        'registry.SubmitStructureRequest',
         on_delete=models.PROTECT,
-        verbose_name=_('Submit structure request')
+        verbose_name=_('Submit structure request'),
     )
     action = models.IntegerField(
         _('Action'),
@@ -173,6 +173,10 @@ class ErrorCode(models.Model):
         (1001, 'FIESTA_1001_HEADER_ORGANISATION_NOT_REGISTERED'),
         (1002, 'FIESTA_1002_HEADER_CONTACT_EMAIL_NOT_FOUND'),
     )
+    class Code(models.IntegerChoices):
+        FIESTA_1001_HEADER_ORGANISATION_NOT_REGISTERED = 1001, 
+
+        
     status_message = models.ForeignKey(
         'registry.StatusMessage',
         on_delete=models.CASCADE,
@@ -189,6 +193,7 @@ class ErrorCode(models.Model):
         verbose_name_plural = _('Error codes')
 
 class Header(models.Model):
+    ACTION_CHOICES = ACTION_CHOICES
     log = models.OneToOneField(
         'registry.Log', 
         on_delete=models.PROTECT,
@@ -227,7 +232,7 @@ class Header(models.Model):
         null=False,
     )
     structure = models.OneToOneField(
-        'registry.Structure',
+        'registry.PayloadStructure',
         on_delete=models.PROTECT,
         verbose_name=_('Structure'),
         null=True,
@@ -289,7 +294,28 @@ class Header(models.Model):
         verbose_name = _('Header')
         verbose_name_plural = _('Headers')
 
-class Structure(models.Model):
+class PayloadStructure(models.Model):
+    provision_agreement = models.ForeignKey(
+        'registry.ProvisionAgreementReference',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name=_('Provision agreement')
+    )
+    structure_usage = models.ForeignKey(
+        'datastructure.DataflowReference',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name=_('Structure usage')
+    )
+    structure = models.ForeignKey(
+        'datastructure.DataStructureReference',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name=_('Structure')
+    )
     structure_id = models.CharField(
         _('Structure ID'),
         max_length=SMALL,
@@ -331,6 +357,8 @@ class Structure(models.Model):
 
     class Meta:
         abstract = True
+        verbose_name = _('Payload structure')
+        verbose_name_plural = _('Payload structures')
 
 class Party(common.AbstractNameable):
     object_id = models.CharField(
@@ -350,43 +378,74 @@ class Contact(common.AbstractContact):
     party = models.ForeignKey(
         'registry.Party',
         on_delete=models.CASCADE,
-        verbose_name=_('Party')
+        verbose_name=_('Party'),
+        related_name='contact_set',
+        related_query_name='contact'
     )
 
     class Meta(common.AbstractContact.Meta):
         abstract = True
 
-class AbstractContactInfo(models.Model):
+class Telephone(common.AbstractTelephone):
     contact = models.ForeignKey(
         'registry.Contact',
         on_delete=models.CASCADE,
-        verbose_name=_('Contact')
+        verbose_name=_('Contact'),
+        related_name='telephone_set',
+        related_query_name='telephone',
     )
-
-    class Meta:
-        abstract = True
-
-class Telephone(AbstractContactInfo, common.AbstractTelephone):
 
     class Meta(common.AbstractTelephone.Meta):
         abstract = True
 
-class Fax(AbstractContactInfo, common.AbstractFax):
+
+class Fax(common.AbstractFax):
+    contact = models.ForeignKey(
+        'registry.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact'),
+        related_name='fax_set',
+        related_query_name='fax',
+    )
 
     class Meta(common.AbstractFax.Meta):
         abstract = True
 
-class X400(AbstractContactInfo, common.AbstractX400):
+
+class X400(common.AbstractX400):
+    contact = models.ForeignKey(
+        'registry.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact'),
+        related_name='x400_set',
+        related_query_name='x400',
+    )
 
     class Meta(common.AbstractX400.Meta):
         abstract = True
 
-class Email(AbstractContactInfo, common.AbstractEmail):
+
+class Email(common.AbstractEmail):
+    contact = models.ForeignKey(
+        'registry.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact'),
+        related_name='email_set',
+        related_query_name='email',
+    )
 
     class Meta(common.AbstractEmail.Meta):
         abstract = True
 
-class URI(AbstractContactInfo, common.AbstractURI):
+
+class URI(common.AbstractURI):
+    contact = models.ForeignKey(
+        'registry.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact'),
+        related_name='uri_set',
+        related_query_name='uri',
+    )
 
     class Meta(common.AbstractURI.Meta):
         abstract = True
@@ -462,6 +521,32 @@ class URI(AbstractContactInfo, common.AbstractURI):
 #         abstract = True
 #
 
+class Annotation(common.Annotation):
+    provision_agreement = models.ForeignKey(
+        'registry.ProvisionAgreement',
+        on_delete=models.CASCADE,
+        verbose_name=_('Provision agreement'),
+        null=True,
+        blank=True,
+    )
+    attachment_constraint = models.ForeignKey(
+        'registry.AttachmentConstraint',
+        on_delete=models.CASCADE,
+        verbose_name=_('Attachment constraint'),
+        null=True,
+        blank=True,
+    )
+    content_constraint = models.ForeignKey(
+        'registry.ContentConstraint',
+        on_delete=models.CASCADE,
+        verbose_name=_('Content constraint'),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        abstract = True
+
 class ProvisionAgreementReference(common.AbstractReference):
     class Meta(common.AbstractReference.Meta):
         abstract = True
@@ -469,12 +554,6 @@ class ProvisionAgreementReference(common.AbstractReference):
         verbose_name_plural = _('Provision agreement references')
 
 class ProvisionAgreement(common.AbstractMaintainable):
-    content_constraint = models.ForeignKey(
-        'registry.ContentConstraintReference',
-        on_delete=models.SET_NULL,
-        null=True,
-        verbose_name=_('Content constraint reference')
-    )
     dataflow = models.ForeignKey(
         'registry.ProvisionAgreementReference', 
         on_delete=models.PROTECT,
@@ -498,6 +577,10 @@ class AttachmentConstraintReference(common.AbstractReference):
         verbose_name_plural = _('Attachment constraint references')
 
 class AttachmentConstraint(common.AbstractMaintainable):
+    data_structures = models.ManyToManyField(
+        'datastructure.DataStructureReference',
+        verbose_name=_('Data structures')
+    )
 
     class Meta(common.AbstractMaintainable.Meta):
         abstract = True
@@ -515,17 +598,38 @@ class ContentConstraint(common.AbstractMaintainable):
         (0, 'ACTUAL', 'Actual'),
         (1, 'ALLOWED', 'Allowed'),
     )
+    data_provider = models.ForeignKey(
+        'base.DataProviderReference',
+        on_delete=models.PROTECT,
+        verbose_name=_('Data provider'),
+        null=True,
+        blank=True
+    )
+    data_structures = models.ManyToManyField(
+        'datastructure.DataStructureReference',
+        verbose_name=_('Data structures')
+    )
+    dataflows = models.ManyToManyField(
+        'datastructure.DataflowReference',
+        verbose_name=_('Dataflows')
+    )
+    provision_agreements = models.ManyToManyField(
+        'datastructure.ProvisionAgreement',
+        verbose_name=_('Provision agreements')
+    )
     release_calendar = models.ForeignKey(
         'registry.ReleaseCalendar',
         on_delete=models.CASCADE,
         verbose_name=_('Release calendar'),
-        null=True
+        null=True,
+        blank=True
     )
     reference_period = models.ForeignKey(
         'common.ReferencePeriod',
         on_delete=models.CASCADE,
         verbose_name=_('Reference period'),
-        null=True
+        null=True,
+        blank=True
     )
     tipe = models.IntegerField(
         _('type'), 
@@ -605,9 +709,18 @@ class CubeRegion(AbstractRegion):
         verbose_name_plural = _('Cube regions')
 
 class CubeRegionKey(models.Model):
-    cube_region = models.ForeignKey(
+    key_value = models.ForeignKey(
         'CubeRegion',
         on_delete=models.CASCADE,
+        related_name='key_value_set',
+        related_query_name='key_value', 
+        verbose_name=_('Cube region')
+    )
+    attribute = models.ForeignKey(
+        'CubeRegion',
+        on_delete=models.CASCADE,
+        related_name='attribute_set',
+        related_query_name='attribute', 
         verbose_name=_('Cube region')
     )
     component_id = models.CharField(
@@ -624,6 +737,8 @@ class CubeRegionKeyValue(models.Model):
     cube_region_key = models.ForeignKey(
         'CubeRegionKey',
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         verbose_name=_('Cube region key')
     )
     cascade_values = models.BooleanField(
@@ -642,9 +757,11 @@ class CubeRegionKeyValue(models.Model):
         verbose_name_plural = _('Cube region key values')
 
 class CubeRegionKeyTimeRange(models.Model):
-    cube_region_key = models.ForeignKey(
+    cube_region_key = models.OneToOneField(
         'CubeRegionKey',
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         verbose_name=_('Cube region key')
     )
     before_period = models.ForeignKey(

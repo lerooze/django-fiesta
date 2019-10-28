@@ -341,16 +341,17 @@ class FieldOptions:
 
         # Set default namespace_key for not attribute fields
         if self.namespace_key is None and not self.is_attribute:
-            self.namespace_key = cls._meta.namespace_key
+            for cls_res in cls.__mro__:
+                if self.fld.name in vars(cls_res): 
+                    self.namespace_key = cls_res._meta.namespace_key
 
         # Set tag
-        self.tag = QName(constants.NAMESPACE_MAP.get(self.namespace_key), self.localname)
+        self.tag = QName(constants.NAMESPACE_21_MAP.get(self.namespace_key), self.localname)
 
         # Set related_name
         if not self.related_name: self.related_name = f'{self.fld.name}_set'
         # Set default forward_accesor
-        if self.forward and not self.forward_accesor:
-            self.forward_accesor = self.fld.name
+        if self.forward_accesor: self.forward_accesor = self.fld.name
 
 def default_results():
     # Returns a submitted structures mapping: 

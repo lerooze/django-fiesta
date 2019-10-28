@@ -23,7 +23,6 @@ django-extensions = "*"
 pydotplus = "*"
 
 [packages]
-django = "*"
 lxml = "*"
 djangorestframework = "*"
 inflection = "*"
@@ -33,8 +32,10 @@ requests = "*"
 isodate = "*"
 django-modeltranslation = "*"
 django-fiesta = {editable = true,path = "."}
-django-oscar = "*"
-django-model-utils = "*"
+django = "*"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true

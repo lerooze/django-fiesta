@@ -11,7 +11,9 @@ from ..core import constants
 from ..core.serializers.options import (
     ProcessContextOptions, RESTfulQueryContextOptions)
 from ..core.serializers.structure import StructureSerializer
-from ..core.exceptions import NotImplementedError, ParseSerializeError
+from ..core.exceptions import (
+    NotImplementedError, ParseSerializeError, ExternalRequestException
+)
 
 from ..permissions import HasMaintainablePermission
 
@@ -22,20 +24,23 @@ class SubmitStructureRequestView(APIView):
         log_model = apps.get_model('registry', 'log')
         log = log_model.objects.create(
             user=request.user,
-            channel='Registry',
-            progress='Submitted',
+            channel=log_model.CHANNEL_CHOICES.UPLOADSTRUCTUREREST,
+            progress=log_model.PROGRESS_CHOICES.SUBMITTED,
         )
-        log.update_progress('Negotiating Content')
+        log.update_progress(log_model.PROGRESS_CHOICES.NEGOTIATING)
         request.body
-        log.update_progress('Parsing')
+        log.update_progress(log_model.PROGRESS_CHOICES.PARSING)
         try:
             data = request.data
-        except (ParseError, ParseSerializeError, NotImplementedError) as exc:
+        except (ParseError, ParseSerializeError, NotImplementedError,
+                ExternalRequestException) as exc:
             exceptions_file = ContentFile(exc.detail)
             log.exceptions_file.save(f'EXCEPTIONS_{data.m_header.id}', exceptions_file)
-            log.update_progress('Finished') 
+            request_file = ContentFile(request.stream)
+            log.request_file.save(f'REQUEST_{data.m_header.id}', request_file)
+            log.update_progress(log_model.PROGRESS_CHOICES.COMPLETED) 
             raise exc
-        log.update_progress('Processing')
+        log.update_progress(log_model.PROGRESS_CHOICES.COMPLETED)
         context = ProcessContextOptions(request, log)
         data.process(context=context)
         outdata = data.to_response()

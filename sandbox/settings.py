@@ -59,6 +59,7 @@ TEMPLATES = [
 
 REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
+        'fiesta.parsers.XMLParser21',
         'fiesta.parsers.XMLParser',
     ),
     'DEFAULT_RENDERER_CLASSES': (

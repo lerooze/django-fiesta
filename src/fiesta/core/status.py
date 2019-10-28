@@ -50,6 +50,10 @@ FIESTA_2103_SOAP_PULLING_NOT_IMPLEMENTED = CommonStatusMessage(
     2103,
     _('SOAP structure pulling not implemented')
 )
+FIESTA_2104_PROTECTED = CommonStatusMessage(
+    2104,
+    _('Artefact cannot be deleted since it is refererenced by a parent artefact')
+)
 
 #422
 FIESTA_2201_PULLED_NOT_STRUCTURE = CommonStatusMessage(

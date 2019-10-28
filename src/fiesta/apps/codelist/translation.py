@@ -2,8 +2,9 @@
 
 from modeltranslation.translator import translator
 
-from ..common.translation import NameableTranslation
+from ..common.translation import NameableTranslation, AnnotationTranslation
 
-from .models import Codelist, Code
+from .models import Annotation, Codelist, Code
 
+translator.register(Annotation, AnnotationTranslation)
 translator.register([Codelist, Code], NameableTranslation)

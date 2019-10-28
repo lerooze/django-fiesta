@@ -1,7 +1,6 @@
 # base.py
 
 import inspect
-import modeltranslation
 
 from importlib import import_module
 from dataclasses import dataclass, fields, InitVar, field
@@ -131,6 +130,9 @@ class Serializer(metaclass=BaseMetaSerializer):
         # Set on _serialize_instance used for debugging 
         self._instance = None
 
+        # Set on process method for maintainable artefacts 
+        self._created = None
+
         if isinstance(instance, models.Model):
             self._serialize_instance(instance, complain)
         else:
@@ -150,39 +152,36 @@ class Serializer(metaclass=BaseMetaSerializer):
                 raise TypeError(
                     f'Serialization of {instance} is not possible via {self._meta.object_name}'
                 )
-        # Loop over fields, extract relevant info from instane and assign values  
+        # Loop over serializer fields and use instance components to set its
+        # value and the field type to set their values
         for f in self._meta.fields:
             field_meta = f.metadata['fiesta']
-            value = getattr(instance, f.name, None)
-            if issubclass(f.type, EmptySerializer) and value:
+            forward_accesor = field_meta.forward_accesor
+            value = getattr(instance, forward_accesor, None)
+            base = self.import_serializer('Serializer')
+            empty = self.import_serializer('Empty')
+            if issubclass(f.type, empty) and value:
                 value = f.type()
-            elif issubclass(f.type, Serializer):
+            elif issubclass(f.type, base):
                 if value:
                     value = f.type(value, complain=False)
                 else:
+                    # Propagate instance forward if instance does not have a
+                    # f.name attribute
                     value = f.type(instance, complain=False)
             elif type(f.type) == type(Iterable):
                 item_type = f.type.__args__[0]
-                if not issubclass(item_type, Serializer):
+                if not issubclass(item_type, base):
                     raise TypeError('Got an unexpected iterable type {item_type} while serializing {obj}')
-                item_set = self.get_item_set(field_meta.related_name)
-                value = self.get_item_set_value(item_set, item_type)
-            elif field_meta.forward:
-                value = getattr(instance, field_meta.forward_accesor, None)
+                value = item_type.generate_many(instance, forward_accesor)
             else:
                 raise KeyError(f'Encountered an unknown type field: {f.type}')
             setattr(self, f.name, value)
 
-    def get_item_set(self, related_name):
-        return getattr(self._instance, related_name)
-
-    def get_item_set_value(self, item_set, item_type):
-        if not item_set: return
-        if isinstance(item_set[0]._meta, modeltranslation.manager.MultilingualManager):
-            value = (item_type(item, lang=lang) for item in item_set for lang in settings.LANGUAGES)
-        else:
-            value = (item_type(item) for item in item_set)
-        return value
+    @classmethod
+    def generate_many(cls, instance, forward_accesor):
+        item_set = getattr(instance, forward_accesor)
+        return (cls(item) for item in item_set)
 
     def unroll(self):
         """
@@ -215,15 +214,14 @@ class Serializer(metaclass=BaseMetaSerializer):
             attrib['structureURL'] = self.make_structure_url()
         return attrib
 
-    def process(self, wrapper=None, field=None, context=None, dsd=None):
+    def process(self, container=None, field=None, context=None, dsd=None):
         """
         Main entry point for CRUD database operations
 
         It inspects the instance and applies andy CRUD operations required.
 
         Args:
-            wrapper (Serializer): In a nested call it is the
-                Serializer instance of the previous node.
+            container (Serializer): Previous node serializer or None for root node 
             field(Field): The field that a nested process call is bound to.
             context (ProcessMeta): A ProcessContextOptions dataclass instance that is
                 used to pass information between nested calls.
@@ -236,9 +234,9 @@ class Serializer(metaclass=BaseMetaSerializer):
         # context=dict(request=request, errors={}, 
         # structure=None, submission_results=None, submitted, stop=False)
         
-        # This is the wrapper dataclass.  It is None if the `process` call is
+        # This is the container dataclass.  It is None if the `process` call is
         # the initial not nested call.
-        self._wrapper = wrapper
+        self._container = container
 
         # This is the Field that is currently processed. It is none
         # if it is the root process
@@ -338,7 +336,7 @@ class Serializer(metaclass=BaseMetaSerializer):
         """
         if not self._meta.model:
             try:
-                return self._wrapper._obj
+                return self._container._obj
             except AttributeError:
                 pass
 
@@ -385,6 +383,17 @@ class Serializer(metaclass=BaseMetaSerializer):
 
         if self._stop: return True
 
+    def update_translateable(self, obj, field):
+        for trans in getattr(self, field):
+            setattr(obj, f'{field}_{trans.lang}', trans.text)
+
+    def create_structure_header(self, content_type):
+        content_type = self._context.request.content_type
+        application, version = content_type.split(';')
+        format_type = application.split('/')[1]
+        if not version: version = f"version={settings.FIESTA['DEFAULT_VERSION']}"
+        return f'application/vnd.sdmx.structure+{format_type};{version}'
+
     def __eq__(self, other):
         if type(self) != type(other): return False
         gs = lambda f: getattr(self, f.name)
@@ -425,6 +434,11 @@ class Serializer(metaclass=BaseMetaSerializer):
         model = apps.get_model(ref.package, ref.cls)
         instance = model.get_from_ref(ref) 
         return serializer(instance)
+
+    def import_serializer(self, name):
+        serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
+        name = f'{name}Serializer'
+        return getattr(serializers, name)
 
 class EmptySerializer(Serializer, metaclass=BaseEmptyMetaSerializer):
     """

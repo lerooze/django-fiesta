@@ -30,6 +30,7 @@ DEFAULTS = {
     'DEFAULT_NEW_USER_PASSWORD': 'not_so_secret_password',
     'DEFAULT_SERIALIZER_MODULE': 'fiesta.core.serializers',
     'DEFAULT_TOP_AGENCY': 'FIESTA',
+    'DEFAULT_VERSION': '2.1'
 }
 
 IMPORT_STRINGS = []

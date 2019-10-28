@@ -1,7 +1,7 @@
 from fiesta.apps.registry.abstract_models import (
-    Log, SubmitStructureRequest, SubmittedStructure, StatusMessage,
-    ErrorCode, Header, Structure, Party, Contact, Telephone, Fax, X400, Email,
-    URI, ProvisionAgreementReference, ProvisionAgreement,
+    Log, SubmitStructureRequest, SubmittedStructure, StatusMessage, ErrorCode,
+    Header, Structure, Party, Contact, Telephone, Fax, X400, Email, URI,
+    Annotation, ProvisionAgreementReference, ProvisionAgreement,
     AttachmentConstraintReference, AttachmentConstraint,
     ContentConstraintReference, ContentConstraint, KeySet, Key, SubKey,
     CubeRegion, CubeRegionKey, CubeRegionKeyValue, CubeRegionKeyTimeRange,
@@ -94,6 +94,12 @@ if not is_model_registered('registry', 'URI'):
         pass
 
     __all__.append('URI')
+
+if not is_model_registered('registry', 'Annotation'):
+    class Annotation(Annotation):
+        pass
+
+    __all__.append('Annotation')
 
 if not is_model_registered('registry', 'ProvisionAgreementReference'):
     class ProvisionAgreementReference(ProvisionAgreementReference):

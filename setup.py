@@ -20,11 +20,9 @@ abs_here = os.path.abspath(local_here)
 sys.path.append(os.path.join(local_here, 'src'))
 
 install_requires = [
-    'django>=2.2,<2.3',
-    # for core functionality
-    'django-oscar',
+    'django',
     # for REST web services
-    'djangorestframework>=3.9',
+    'djangorestframework',
     # lxml for xml parsing, schema validation and xml generation
     'lxml',
     # for manipulating strings

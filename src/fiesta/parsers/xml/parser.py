@@ -1,14 +1,11 @@
 # parser.py
 
 import inspect
-import requests
 
 from importlib import import_module
 from lxml import etree # TODO work on xml security
 from rest_framework.exceptions import ParseError, UnsupportedMediaType
 from rest_framework.parsers import BaseParser
-from rest_framework.response import Response
-from tempfile import SpooledTemporaryFile
 from typing import Iterable
 from zipfile import ZipFile, is_zipfile
 
@@ -18,7 +15,7 @@ from ...core import constants
 from ...core.exceptions import NotImplementedError, ParseSerializeError
 from ...core.schema import Schema21
 
-class XMLParser(BaseParser):
+class BaseXMLParser(BaseParser):
     """
     XML parser.
     """
@@ -26,6 +23,15 @@ class XMLParser(BaseParser):
 
     def __init__(self, *args, **kwargs):
         self.serializers = import_module(api_settings.DEFAULT_SERIALIZER_MODULE)
+    
+    def get_version(self, media_type):
+        try:
+            version = media_type.split(';')[1].split('=')[1]
+        except (IndexError, AttributeError):
+            version = '2.1'
+        if version != '2.1':
+            raise UnsupportedMediaType(media_type)
+        return version.replace('.', '')
 
     def get_root(self, stream):
         if is_zipfile(stream):
@@ -53,12 +59,7 @@ class XMLParser(BaseParser):
         """
         Parses the incoming bytestream as XML and returns the resulting data.
         """
-        try:
-            version = media_type.split(';')[1].split('=')[1]
-        except (IndexError, AttributeError):
-            version = '2.1'
-        if version != '2.1':
-            raise UnsupportedMediaType(media_type)
+        self.version = self.get_version(media_type)
         self.root = self.get_root(stream)
         self.validate_roottag()
 
@@ -69,44 +70,6 @@ class XMLParser(BaseParser):
 
         Redefine in subclasses"""
 
-    def get_stream_from_location(self, location):
-        cfg = self.create_configuration(location)
-        response = requests.get(location, **cfg) 
-        if response.status_code == requests.codes.OK:
-            source = SpooledTemporaryFile(max_size=2**24, mode='w+b')
-            for c in response.iter_content(chunk_size=1000000):
-                source.write(c)
-        else:
-            source = None
-        code = int(response.status_code)
-        if 400 <= code <= 499:
-            return Response(f'Getting {location} failed', code)
-        return source
-
-    def get(self, location):
-        try:
-            stream = self.get_stream_from_location(location)
-        except requests.exceptions.MissingSchema:
-            # Load data from local file
-            # json files must be opened in text mode, all others in binary as
-            # they may be zip files or xml.
-            try:
-                if location.endswith('.json'):
-                    mode_str = 'r'
-                else:
-                    mode_str = 'rb'
-                stream = open(location, mode_str)
-            except FileNotFoundError:
-                stream = location 
-        return self.parse(stream)
-
-    def create_configuration(self, location):
-        cfg = dict(stream=True, timeout=30.1)
-        cfg = self.extend_cfg(cfg)
-        return cfg
-
-    def extend_cfg(self, cfg):
-        return cfg
 
     def populate_serializer(self, serializer, complain):
         """
@@ -117,7 +80,7 @@ class XMLParser(BaseParser):
         Redefine in subclasses
         """
 
-        serializer._elem = self.root 
+        if not serializer._elem: serializer._elem = self.root 
         qname = etree.QName(serializer._elem.tag)
         # First check that the element local name is the same as the Dataclass
         # model_name (case insensitive). 
@@ -135,7 +98,15 @@ class XMLParser(BaseParser):
             self.populate_serializer(child_serializer, False)
             yield child_serializer
 
-class XMLParser21(XMLParser):
+    def parse_structures(self, stream):
+        self.root = etree.parse(stream).getroot()
+        serializer = self.serializers.StructuresSerializer()
+        self.populate_serializer(serializer, False)
+        return serializer
+
+class XMLParser21(BaseXMLParser):
+
+    media_type = 'application/xml;version=2.1'
 
     def parse(self, stream, media_type=None, parser_context=None):
         super().parse(stream, media_type, parser_context)
@@ -143,8 +114,9 @@ class XMLParser21(XMLParser):
         if not schema(self.root):
             errors = [(error.line, error.domain, error.type, error.message) for error in schema.error_log]
             raise ParseError(errors)
-        serializer_class = self.get_serializer_class()
-        return self.populate_serializer(serializer_class(), True)
+        serializer = self.get_serializer_class()()
+        self.populate_serializer(serializer, True)
+        return serializer
 
     def get_serializer_class(self):
         payload_tag = etree.QName(self.root[1].tag).localname
@@ -206,3 +178,6 @@ class XMLParser21(XMLParser):
             else:
                 raise ParseSerializeError(f'Encountered an unknown type field: {f.type}')
             setattr(serializer, f.name, value)
+
+class  XMLParser(XMLParser21):
+    media_type = 'application/xml;version=2.1'

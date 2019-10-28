@@ -26,29 +26,8 @@ class SmallString(models.Model):
     class Meta:
         abstract = True
 
-class URLString(models.Model):
-    text = models.URLField(
-        _('URL'),
-        db_index=True
-    )
 
-    class Meta:
-        abstract = True
-        verbose_name = _('URL')
-        verbose_name_plural = _('URLs')
-
-class EmailString(models.Model):
-    text = models.EmailField(
-        _('Email'),
-        db_index=True
-    )
-
-    class Meta:
-        abstract = True
-        verbose_name = _('Email')
-        verbose_name_plural = _('Emails')
-
-class Annotation(models.Model):
+class AbstractAnnotation(models.Model):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -78,16 +57,7 @@ class Annotation(models.Model):
     def __str__(self):
         return '%s:%s:%s' % (self.object_id, self.annotation_title, self.annotation_type)
 
-class AbstractAnnotable(models.Model):
-    annotations = models.ManyToManyField(
-        'common.Annotation',
-        verbose_name=_('Annotations'),
-        related_name='+',
-    )
-    class Meta:
-        abstract = True
-
-class AbstractIdentifiable(AbstractAnnotable):
+class AbstractIdentifiable(models.Model):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -99,7 +69,7 @@ class AbstractIdentifiable(AbstractAnnotable):
     class Meta:
         abstract = True
 
-class AbstractNCNameIdentifiable(AbstractAnnotable):
+class AbstractNCNameIdentifiable(models.Model):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -111,7 +81,7 @@ class AbstractNCNameIdentifiable(AbstractAnnotable):
     class Meta:
         abstract = True
 
-class AbstractNestedNCNameIdentifiable(AbstractAnnotable):
+class AbstractNestedNCNameIdentifiable(models.Model):
     object_id = models.CharField(
         _('ID'), 
         max_length=VERY_SMALL, 
@@ -181,7 +151,7 @@ class AbstractVersionable(AbstractNameable):
     )
     patch = models.IntegerField(
         _('Patch version'), 
-        null=True, 
+        default=0, 
         db_index=True
     )
     valid_from = models.DateTimeField(
@@ -195,6 +165,10 @@ class AbstractVersionable(AbstractNameable):
 
     class Meta:
         abstract = True
+
+    @cached_property
+    def version(self):
+        return f'{self.major}.{self.minor}.{self.patch}'
 
 class AbstractNCNameVersionable(AbstractNCNameNameable, AbstractVersionable):
 
@@ -247,11 +221,6 @@ class AbstractMaintainable(AbstractVersionable):
     def label(self):
         return self.__class__._meta.label
 
-    @property
-    def version(self):
-        version = f'{self.major}.{self.minor}'
-        if self.patch: version = f'{version}.{self.patch}'
-        return version
 
 class AbstractNCNameMaintainable(AbstractMaintainable):
     object_id = models.CharField(
@@ -408,17 +377,17 @@ class AbstractReference(models.Model):
         validators=[re_validators['NCNameIDType']],
         db_index=True
     )
-    major_version = models.IntegerField(
+    major = models.IntegerField(
         _('Major version'), 
         default=1, 
         db_index=True
     )
-    minor_version = models.IntegerField(
+    minor = models.IntegerField(
         _('Minor version'), 
         default=0, 
         db_index=True
     )
-    patch_version = models.IntegerField(
+    patch = models.IntegerField(
         _('Patch version'), 
         null=True, 
         db_index=True
@@ -426,6 +395,15 @@ class AbstractReference(models.Model):
 
     class Meta:
         abstract = True
+
+    @cached_property
+    def version(self):
+        major = '*' if self.major is None else str(self.major)
+        minor = '*' if self.minor is None else str(self.minor)
+        patch = '*' if self.patch is None else str(self.patch)
+        version = f'{major}.{minor}.{patch}'
+        if version == '1.0.0': version = '1.0'
+        return version
 
 class AbstractItemReference(AbstractReference):
     item_object_id = models.CharField(
@@ -672,7 +650,52 @@ class ReferencePeriod(models.Model):
     def __str__(self):
         return f'{self.start_time}-{self.end_time}'
 
-class AbstractContact(models.Model):
+class Contact(models.Model):
+    party = models.ForeignKey(
+        'registry.Party',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_('Party'),
+        related_name='contact_set',
+        related_query_name='contact',
+    )
+    agency = models.ForeignKey(
+        'base.Agency',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_('Agency'),
+        related_name='contact_set',
+        related_query_name='contact',
+    )
+    data_provider = models.ForeignKey(
+        'base.DataProvider',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_('Data provider'),
+        related_name='contact_set',
+        related_query_name='contact',
+    )
+    data_consumer = models.ForeignKey(
+        'base.DataConsumer',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_('Data consumer'),
+        related_name='contact_set',
+        related_query_name='contact',
+    )
+    organisation_unit = models.ForeignKey(
+        'base.OrganisationUnit',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_('Organisation unit'),
+        related_name='contact_set',
+        related_query_name='contact',
+    )
     name = models.CharField(
         max_length=SMALL,
         verbose_name=_('Name'))
@@ -688,8 +711,13 @@ class AbstractContact(models.Model):
         verbose_name = _('Contact')
         verbose_name_plural = _('Contacts')
 
-class AbstractTelephone(models.Model):
-    telephone = models.CharField(
+class Telephone(models.Model):
+    contact = models.ForeignKey(
+        'common.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact person'),
+    )
+    text = models.CharField(
         _('Telephone'),
         max_length=SMALL,
         db_index=True
@@ -700,8 +728,13 @@ class AbstractTelephone(models.Model):
         verbose_name = _('Telephone')
         verbose_name_plural = _('Telephones')
 
-class AbstractFax(models.Model):
-    fax = models.CharField(
+class Fax(models.Model):
+    contact = models.ForeignKey(
+        'common.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact person'),
+    )
+    text = models.CharField(
         _('Fax'),
         max_length=SMALL,
         db_index=True
@@ -712,8 +745,13 @@ class AbstractFax(models.Model):
         verbose_name = _('Fax')
         verbose_name_plural = _('Faxes')
 
-class AbstractX400(models.Model):
-    x400 = models.CharField(
+class X400(models.Model):
+    contact = models.ForeignKey(
+        'common.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact person'),
+    )
+    text = models.CharField(
         _('X400'),
         max_length=SMALL,
         db_index=True
@@ -724,8 +762,13 @@ class AbstractX400(models.Model):
         verbose_name = _('X400')
         verbose_name_plural = _('X400s')
 
-class AbstractEmail(models.Model):
-    email = models.EmailField(
+class Email(models.Model):
+    contact = models.ForeignKey(
+        'common.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact person'),
+    )
+    text = models.EmailField(
         _('Email'),
         db_index=True
     )
@@ -735,8 +778,14 @@ class AbstractEmail(models.Model):
         verbose_name = _('Email')
         verbose_name_plural = _('Emails')
 
-class AbstractURI(models.Model):
-    uri = models.URLField(
+
+class URI(models.Model):
+    contact = models.ForeignKey(
+        'common.Contact',
+        on_delete=models.CASCADE,
+        verbose_name=_('Contact person'),
+    )
+    text = models.URLField(
         _('URI'),
         db_index=True
     )

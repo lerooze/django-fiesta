@@ -9,17 +9,20 @@ from decimal import Decimal
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.db import transaction
+from django.db import transaction, ProtectedError
 from django.db.models import Q
 from django.utils import translation
+from django.utils.functional import cached_property
+from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import ExternalError
 from importlib import import_module
 from lxml.etree import QName
-from typing import Iterable
+from typing import Iterable, List
 
 from .. import status, constants, patterns
-from ...parsers import XMLParser
 from ...utils.translation import get_language
 from ...settings import api_settings
+from ...external import Request as ExternalRequest
 
 from .base import field, Serializer, EmptySerializer
 
@@ -28,80 +31,65 @@ class CommonSerializer(Serializer):
     class Meta:
         namespace_key = 'common'
 
-class ReferencePeriodSerializer(CommonSerializer):
-    start_time: datetime = field()
-    end_time: datetime = field()
-
-    class Meta:
-        app_name = 'common'
-        model_name = 'referenceperiod'
-        namespace_key = 'common'
-
-    def process_premake(self):
-        obj, _ = self._meta.model.objects.get_or_create(
-            start_time = self.start_time,
-            end_time = self.end_time
-        )
-        return obj
-
 class RegistrySerializer(Serializer):
 
     class Meta:
         namespace_key = 'registry'
 
-class BaseStructureSerializer(Serializer):
-
-    class Meta:
-        namespace_key = 'structure'
-
 class StringSerializer(Serializer):
     text: str = field(is_text=True)
 
-    class Meta:
-        namespace_key = 'common'
+    def __post_init__(self, *args, **kwargs):
+        if isinstance(self._instance, str):
+            self.text = self._instance
+        else:
+            self.text = self._instance.text
 
-class ValueSerializer(StringSerializer):
+class ValueSerializer(Serializer):
+    text: str = field(is_text=True)
     cascade_values: bool = field(is_attribute=True, default=False)
 
-class TextSerializer(StringSerializer):
+class TextSerializer(Serializer):
+    text: str = field(is_text=True)
     lang: str = field(is_attribute=True, namespace_key='xml', default='en')
 
-    # class Meta:
-    #     app_name = 'common'
-    #     model_name = 'text'
-
-    def __post_init__(self, *args, **kwargs):
-        super().__post_init__(*args, **kwargs)
-        if self._instance:
-            self.text = getattr(self._instance, f'text_{self.lang}', None)
-
-    def process_prevalidate(self):
-        if not self.lang in settings.LANGUAGES: 
-            self._context.result.status_message.update(
-                'Failure',
-                status.FIESTA_2501_NOT_SUPPORTED_LANGUAGE
-            )
-
-    def process_premake(self):
-        return self._meta.model.get_or_create(
-            polymorphic_obj=self._wrapper._obj,
-            text=self.text,
-            text_type=self._field.name,
-            language=self.lang
-        )
+    @classmethod
+    def generate_many(cls, instance, forward_accesor):
+        for lang in settings.LANGUAGES:
+            text = getattr(instance, f'{forward_accesor}_lang')
+            yield cls(lang=lang, text=text)
 
 class SimpleStringSerializer(Serializer):
     value: str = field(is_text=True)
 
-class RefSerializer(Serializer):
+class SimpleStringContactSerializer(SimpleStringSerializer):
+
+    def process_premake(self):
+        return self._meta.model.create(
+            value=self.value,
+            contact=self._container._obj
+        )
+
+class ContactSerializer(Serializer):
+
+    name: Iterable[TextSerializer] = field(namespace_key='common')
+    department: Iterable[TextSerializer] = field()
+    role: Iterable[TextSerializer] = field()
+    telephone: Iterable[StringSerializer] = field(is_text=True)
+    fax: Iterable[StringSerializer] = field(is_text=True)
+    x400: Iterable[StringSerializer] = field(is_text=True)
+    uri: Iterable[StringSerializer] = field(localname='URI', is_text=True)
+    email: Iterable[StringSerializer] = field(is_text=True)
+
+    class Meta:
+        namespace_key = 'message'
+
+class MaintainableRefSerializer(Serializer):
     agency_id: str = field(localname='agencyID', is_attribute=True,
                            forward=True, forward_accesor='agency__object_id')
-    maintainable_parent_id: str = field(localname='maintainableParentID', is_attribute=True, forward=True, forward_accesor='wrapper__object_id')
-    maintainable_parent_version: str = field(is_attribute=True, forward=True, forward_accesor='wrapper__version')
-    container_id: str = field(localname='containerID', is_attribute=True)
     object_id: str = field(localname='id', is_attribute=True)
     version: str = field(is_attribute=True)
-    local: bool = field(is_attribute=True)
+    local: bool = field(is_attribute=True, default=False)
     cls: str= field(localname='class', is_attribute=True)
     package: str = field(is_attribute=True)
 
@@ -109,342 +97,149 @@ class RefSerializer(Serializer):
         super().__post_init__(*args, **kwargs)
         if not self._instance: return
         object_name = self._instance.__class__._meta.object_name
-        if object_name == 'codelist':
+        if object_name == 'codelistreference':
             self.cls = 'Codelist'
             self.package = 'codelist'
-        elif object_name == 'code':
-            self.cls = 'Code'
-            self.package = 'codelist'
-        elif object_name == 'conceptscheme':
+        elif object_name == 'conceptschemereference':
             self.cls = 'ConceptScheme'
             self.package = 'conceptscheme'
+        elif object_name == 'datastructurereference':
+            self.cls = 'DataStructure'
+            self.package = 'datastructure'
+        elif object_name == 'dataflowreference':
+            self.cls = 'Dataflow'
+            self.package = 'datastructure'
+        elif object_name == 'attachmentconstraintreference':
+            self.cls = 'AttachmentConstraint'
+            self.package = 'registry'
+        elif object_name == 'contentconstraintreference':
+            self.cls = 'ContentConstraint'
+            self.package = 'registry'
+        elif object_name == 'provisionagreementreference':
+            self.cls = 'ProvisionAgreement'
+            self.package = 'registry'
+
+class ItemRefSerializer(Serializer):
+    agency_id: str = field(localname='agencyID', is_attribute=True,
+                           forward=True, forward_accesor='agency__object_id')
+    maintainable_parent_id: str = field(localname='maintainableParentID', is_attribute=True, forward=True, forward_accesor='object_id')
+    maintainable_parent_version: str = field(is_attribute=True, forward=True, forward_accesor='version')
+    object_id: str = field(localname='id', is_attribute=True, forward_accesor='item_object_id')
+    version: str = field(is_attribute=True)
+    local: bool = field(is_attribute=True, default=False)
+    cls: str= field(localname='class', is_attribute=True)
+    package: str = field(is_attribute=True)
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        if not self._instance: return
+        object_name = self._instance.__class__._meta.object_name
+        if object_name == 'codereference':
+            self.cls = 'Code'
+            self.package = 'codelist'
+        elif object_name == 'conceptreference':
+            self.cls = 'Concept'
+            self.package = 'conceptscheme'
+        elif object_name == 'dataproviderreference':
+            self.cls = 'DataProvider'
+            self.package = 'base'
+        elif object_name == 'dataconsumerreference':
+            self.cls = 'DataConsumer'
+            self.package = 'base'
+        elif object_name == 'organisationunitreference':
+            self.cls = 'OrganisationUnit'
+            self.package = 'base'
+
+class LocalRefSerializer(Serializer):
+    object_id: str = field(localname='id', is_attribute=True, forward_accesor='object_id')
+    local: bool = field(is_attribute=True, default=True)
+    cls: str= field(localname='class', is_attribute=True)
+    package: str = field(is_attribute=True)
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        if not self._instance: return
+        object_name = self._instance.__class__._meta.object_name
+        if object_name == 'code':
+            self.cls = 'Code'
+            self.package = 'codelist'
         elif object_name == 'concept':
             self.cls = 'Concept'
             self.package = 'conceptscheme'
-        elif object_name == 'datastructure':
-            self.cls = 'DataStructure'
-            self.package = 'datastructure'
-        elif object_name == 'dataflow':
-            self.cls = 'Dataflow'
-            self.package = 'datastructure'
-        elif object_name == 'attachmentconstraint':
-            self.cls = 'AttachmentConstraint'
-            self.package = 'registry'
-        elif object_name == 'dimension':
-            if not self.object_id:
-                self.object_id = self._obj 
+        elif object_name == 'organisationunit':
+            self.cls = 'OrganisationUnit'
+            self.package = 'base'
+        elif object_name == 'Dimension':
             self.cls = 'Dimension'
             self.package = 'datastructure'
-        elif object_name == 'group':
-            self.cls = 'GroupDimensionDescriptor'
+        elif object_name == 'Group':
+            self.cls = 'Group'
             self.package = 'datastructure'
         elif object_name == 'primarymeasure':
             self.cls = 'PrimaryMeasure'
             self.package = 'datastructure'
-        elif object_name == 'provisionagreement':
-            self.cls = 'ProvisionAgreement'
-            self.package = 'registry'
-        elif object_name == 'organisation':
-            if self._field.name == 'data_provider':
-                self.cls = 'DataProvider'
-                self.package = 'base'
-            elif self._field.name == 'data_consumer':
-                self.cls = 'DataConsumer'
-                self.package = 'base'
 
-    def process_premake(self):
-        model = apps.get_model(self.package, self.cls)
-        return model.objects.get_from_ref(self)
 
-class ReferenceSerializer(CommonSerializer):
-    ref: RefSerializer = field(namespace_key='')
-    urn: str = field(localname='URN', namespace_key='')
+class ReferenceSerializer(Serializer):
 
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(*args, **kwargs)
-        self.dref = self._urn_to_ref() or self.ref
+        if self._element: 
+            self.dref = self._urn_to_ref() or self.ref
 
-    def make_maintainable_urn(self):
-        if self.urn: return self.urn
-        d = self.dref
-        urn = f'urn:sdmx:infomodel.{d.package}.{d.cls}={d.agency_id}:{d.object_id}({d.version})' 
-        return urn
+    def process_postmake(self):
+        return self.m_ref
+
+class MaintainableReferenceSerializer(ReferenceSerializer):
+    ref: MaintainableRefSerializer = field(namespace_key='')
+    urn: str = field(localname='URN', namespace_key='')
 
     def _urn_to_ref(self):
         if not self.urn: return
-        ref = RefSerializer()
+        ref = MaintainableRefSerializer()
         lurn, rurn = self.urn.split('=')
         lurn = lurn.split(':')[-1]
         _, ref.package, ref.cls = lurn.split('.')
         ref.agency_id, remaining = rurn.split(':')
         match = patterns.MAINTAINABLE.match(remaining)
-        if match:
-            ref.object_id = match.group('object_id')
-            ref.version = match.group('version') or '1.0'
-        else:
-            match = patterns.PARENTABLE.match(remaining)
-            ref.object_id = match.group('object_id')
-            ref.version = match.group('version') or '1.0'
-            ref.maintainable_parent_id = match.group('maintainable_parent_id')
-            ref.maintainable_parent_version = match.group('maintainable_parent_version')
-            ref.container_id = match.group('container_id')
+        ref.object_id = match.group('object_id')
+        ref.version = match.group('version') or '1.0'
         return ref
 
-    def process_postmake(self):
-        return self.m_ref
+    def make_urn(self):
+        if self.urn: return self.urn
+        d = self.dref
+        urn = f'urn:sdmx:infomodel.{d.package}.{d.cls}={d.agency_id}:{d.object_id}({d.version})' 
+        return urn
 
-class SimpleStringContactSerializer(SimpleStringSerializer):
+class ItemReferenceSerializer(ReferenceSerializer):
+    ref: ItemRefSerializer = field(namespace_key='')
+    urn: str = field(localname='URN', namespace_key='')
 
-    def process_premake(self):
-        return self._meta.model.get_or_create(
-            value=self.value,
-            contact=self._wrapper._obj
-        )
+    def _urn_to_ref(self):
+        if not self.urn: return
+        ref = ItemRefSerializer()
+        lurn, rurn = self.urn.split('=')
+        lurn = lurn.split(':')[-1]
+        _, ref.package, ref.cls = lurn.split('.')
+        ref.agency_id, remaining = rurn.split(':')
+        match = patterns.PARENTABLE.match(remaining)
+        ref.object_id = match.group('object_id')
+        ref.version = match.group('version') or '1.0'
+        ref.maintainable_parent_id = match.group('maintainable_parent_id')
+        ref.maintainable_parent_version = match.group('maintainable_parent_version')
+        ref.container_id = match.group('container_id')
+        return ref
 
-class TelephoneSerializer(SimpleStringContactSerializer):
-    pass
+    def make_urn(self):
+        if self.urn: return self.urn
+        d = self.dref
+        urn = f'urn:sdmx:infomodel.{d.package}.{d.cls}={d.agency_id}:{d.maintainable_parent_id}({d.maintainable_parent_version}).{d.object_id}' 
+        return urn
 
-    # class Meta:
-    #     app_name = 'base'
-    #     model_name = 'telephone'
+class LocalReferenceSerializer(Serializer):
+    ref: LocalRefSerializer = field(namespace_key='')
 
-class FaxSerializer(SimpleStringContactSerializer):
-    pass
-
-    # class Meta:
-    #     app_name = 'base'
-    #     model_name = 'fax'
-
-class X400Serializer(SimpleStringContactSerializer):
-    pass
-
-    # class Meta:
-    #     app_name = 'base'
-    #     model_name = 'x400'
-
-class URISerializer(SimpleStringContactSerializer):
-    pass
-
-    # class Meta:
-    #     app_name = 'base'
-    #     model_name = 'uri'
-
-class EmailSerializer(SimpleStringContactSerializer):
-    pass
-
-    # class Meta:
-    #     app_name = 'base'
-    #     model_name = 'email'
-
-class BaseContactSerializer(Serializer):
-
-    name: Iterable[TextSerializer] = field(namespace_key='common', related_name='name')
-    department: Iterable[TextSerializer] = field(related_name='department')
-    role: Iterable[TextSerializer] = field(related_name='role')
-    telephone: Iterable[TelephoneSerializer] = field()
-    fax: Iterable[FaxSerializer] = field(forward_accesor='faxes')
-    x400: Iterable[X400Serializer] = field()
-    uri: Iterable[URISerializer] = field(localname='URI')
-    email: Iterable[EmailSerializer] = field()
-
-    class Meta:
-        # app_name = 'base'
-        # model_name = 'Contact'
-        namespace_key = 'message'
-
-    def get_item_set(self, related_name):
-        return self._instance.text.filter(text_type=related_name) 
-
-class ContactSerializer(BaseContactSerializer):
-
-    def process_prevalidate(self):
-        if not self.email:
-            self._context.result.status_message.update(
-                'Warning', 
-                status.FIESTA_2404_NO_EMAIL
-            )
-            self._stop= True
-
-    def process_premake(self):
-        username = list(self.email)[0]
-        obj, self._new_user = self._meta.model.objects.get_or_create(
-            username, self._wrapper)
-        return obj
-
-    def process_postmake(self, obj):
-        if self._new_user:
-            obj.send_password_reset_email(self._context.request)
-        obj.save()
-        return obj
-
-class HeaderContactSerializer(BaseContactSerializer):
-
-    def process_prevalidate(self):
-        # Checking that contact has an email
-        if not self.email:
-            self._context.result.status_message.update(
-                'Warning',
-                status.FIESTA_1002_HEADER_CONTACT_EMAIL_NOT_FOUND,
-            )
-            obj = None
-        else: 
-            username = self.email[0]
-            try:
-                obj = self._meta.model.objects.get(username=username)
-            except self._meta.model.DoesNotExist:
-                self._context.result.status_message.update(
-                    'Warning',
-                    status.FIESTA_1004_CONTACT_NOT_REGISTERED,
-                    f'Username: {username}'
-                )
-            else:
-                # Checking that user is a member of Organisation
-                if obj.organisation != self._wrapper._obj:
-                    self._context.result.status_message.update(
-                        'Warning',
-                        status.FIESTA_1003_USER_NOT_IN_ORGANISATION,
-                        f'Username {username}, organisation {self._wrapper._obj}'
-                    )
-        self._obj = obj 
-
-    def process_premake(self):
-        self._stop = True
-        return self._obj
-
-class PartySerializer(Serializer):
-
-    name: Iterable[TextSerializer] = field(namespace_key='common')
-    contact: Iterable[HeaderContactSerializer] = field()
-    object_id: str = field(is_attribute=True, localname='id')
-
-    class Meta:
-        # app_name = 'base'
-        # model_name = 'Organisation'
-        namespace_key = 'message'
-
-    def process_prevalidate(self):
-        # Checking that receiver organisation exists
-        try:
-            obj = self._meta.model.objects.get(
-                object_id=self.object_id)
-        except self._meta.model.Organisation.DoesNotExist:
-            self._context.result.status_message.update(
-                'Warning',
-                status.FIESTA_1001_HEADER_ORGANISATION_NOT_REGISTERED,
-                f'[organisation id: {self.object_id}]'
-            )
-            obj = None
-        self._obj = obj 
-
-    def process_premake(self):
-        self._skip_save = True
-        return self._obj
-
-    def wsrest_party(self, registration):
-        if isinstance(registration.user, AnonymousUser):
-            self.object_id='not_supplied'
-            return
-        contact = HeaderContactSerializer(email=[registration.user.username])
-        receiver = registration.user.contact.organisation
-        self.object_id = receiver.object_id
-        self.contact = [contact]
-
-class SenderSerializer(PartySerializer):
-    timezone: str = field(namespace_key='message')
-
-    def wsrest_sender(self):
-        self.object_id = api_settings.DEFAULT_SENDER_ID 
-
-class PayloadStructureSerializer(CommonSerializer):
-    provision_agreement: ReferenceSerializer = field()
-    structure_usage: ReferenceSerializer = field()
-    structure: ReferenceSerializer = field()
-    structure_id: str = field(is_attribute=True, localname='structureID')
-    schema_url: str = field(is_attribute=True, localname='schemaURL')
-    namespace: str = field(is_attribute=True)
-    dimension_at_observation: str = field(is_attribute=True)
-    explicit_measures: str = field(is_attribute=True)
-    service_url: str = field(localname='serviceURL', is_attribute=True)
-    structure_url: str = field(localname='structureURL', is_attribute=True)
-
-class HeaderSerializer(Serializer):
-    object_id: str = field(localname='ID')
-    test: bool = field(default=False)
-    prepared: datetime = field()
-    sender: SenderSerializer = field()
-    receiver: PartySerializer = field()
-    name: Iterable[TextSerializer] = field(namespace_key='common')
-    structure: Iterable[PayloadStructureSerializer] = field()
-    data_provider: ReferenceSerializer = field()
-    data_set_action: str = field()
-    data_set_id: str = field(localname='DataSetID')
-    extracted: datetime = field()
-    reporting_begin: str = field()
-    reporting_end: str = field()
-    embargo_date: datetime = field()
-    source: str = field()
-
-    class Meta:
-        app_name = 'registry'
-        model_name = 'Header'
-        namespace_key = 'message'
-
-    def _header_to_bogus_reference(self):
-        ref = RefSerializer(
-            agency_id='MAIN',
-            object_id='HEADER',
-            version='1.0',
-            cls='Agency',
-            package='base'
-        )
-        reference =  ReferenceSerializer(ref=ref)
-        reference.durn = reference.make_maintainable_urn()
-        return reference
-
-    def to_submission_result(self):
-        reference = self._header_to_bogus_reference()
-        submitted_structure = SubmittedStructureSerializer(
-            maintainable_object=reference, 
-        )
-        submission_result = submitted_structure.to_result()
-        return submission_result
-
-    def process_prevalidate(self):
-        self._context.result = self._context.get_or_add_result(self.to_submission_result())
-
-    def process_postmake(self, obj):
-        super().process_postmake(obj)
-        obj = self._meta.model.objects.create(
-            log=self._context.log,
-            object_id=self.object_id,
-            test=self.test,
-            prepared=self.prepared,
-            sender=self.m_sender,
-            receiver=self.m_receiver,
-        )
-        obj.sender_contacts.add(*self.sender._contact)
-        obj.receiver_contacts.add(*self.receiver._contact)
-        self._sid = transaction.savepoint()
-        return obj
-
-    def to_response(self):
-        header = HeaderSerializer(
-            object_id=self._obj.id,
-            test=self.test,
-            prepared=datetime.now(),
-            sender=self.receiver,
-            receiver=self.sender,
-        )
-        if self.test:
-            transaction.savepoint_rollback(self._sid)
-        return header 
-
-    def to_structure(self, log):
-        self.object_id=log.restful_query.id,
-        self.test=False,
-        self.prepared=log.prepared,
-        self.sender=SenderSerializer().wsrest_sender(),
-        self.receiver=PartySerializer().wsrest_party(log.restful_query),
 
 class AnnotationSerializer(Serializer):
     annotation_title: str = field(is_text=True)
@@ -468,11 +263,17 @@ class AnnotationSerializer(Serializer):
         )
         return obj
 
+    @classmethod
+    def generate_many(cls, instance, forward_accesor):
+        annotation_set = instance.annotation_set
+        return (cls(annotation) for annotation in annotation_set)
+
+
 class AnnotationsSerializer(CommonSerializer):
-    annotations: Iterable[AnnotationSerializer] = field(namespace_key='common', related_name='annotations')
+    annotation: Iterable[AnnotationSerializer] = field(related_name='annotation_set')
 
 class AnnotableSerializer(CommonSerializer):
-    annotations: AnnotationsSerializer = field(namespace_key='common')
+    annotations: AnnotationsSerializer = field()
 
 class IdentifiableSerializer(AnnotableSerializer):
     object_id: str = field(is_attribute=True, localname='id')
@@ -484,6 +285,10 @@ class IdentifiableSerializer(AnnotableSerializer):
         if not self._instance: return
         self.urn = self.make_urn()
         self.uri = self.make_uri()
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.object_id == other.object_id
 
     def make_urn(self):
         pass
@@ -505,10 +310,35 @@ class NameableSerializer(IdentifiableSerializer):
     def get_item_set(self, related_name):
         return self._instance.text.filter(text_type=related_name) 
 
+
 class VersionableSerializer(NameableSerializer):
     version: str = field(is_attribute=True, default='1.0')
     valid_from: datetime = field(is_attribute=True)
     valid_to: datetime = field(is_attribute=True)
+
+    def __post_init__(self):
+        self.version = list(map(int, self.version)) 
+
+    def __eq__(self, other):
+        if not super().__eq__(other): return
+        return self.version == other.version
+
+    def __lt__(self, other):
+        if not super().__eq__(other): return
+        return self.version < other.version
+
+    def __gt__(self, other):
+        if not super().__eq__(other): return
+        return self.version > other.version
+
+    def __ge__(self, other):
+        if not super().__eq__(other): return
+        return self.version >= other.version
+
+    def __le__(self, other):
+        if not super().__eq__(other): return
+        return self.version <= other.version
+
 
     def process_postmake(self, obj):
         obj = super().process_postmake(obj)
@@ -528,12 +358,16 @@ class MaintainableSerializer(VersionableSerializer):
     service_url: str = field(localname='serviceURL', is_attribute=True)
     structure_url: str = field(localname='structureURL', is_attribute=True)
 
+    def __eq__(self, other):
+        if not super().__eq__(other): return
+        return self.agency_id == other.agency_id
+
     def make_structure_url(self):
         resource = constants.CLASS2RESOURCE(self._meta.name)[0]
         return f'http://www.fiesta.org/{resource}/{self.agency_id}/{self.version}'
 
     @classmethod
-    def generate_many(cls, query):
+    def generate_restful_many(cls, query):
         for obj in cls._meta.model.objects.filter(query):
             yield cls(obj)
 
@@ -588,12 +422,12 @@ class MaintainableSerializer(VersionableSerializer):
              (resource not in class_meta.resources))
         )
 
-    def _get_maintainable(self, structures):
-        maintainable_wrapper = self._field.name
-        structure_wrapper_name = self._wrapper._wrapper._context.underscore_name
-        structure_wrapper = getattr(structures, structure_wrapper_name, None)
+    def extract_maintainable(self, structures):
+        maintainables = self._field.name
+        structure_container_name = self._container._container._meta.underscore_name
+        structure_container = getattr(structures, structure_container_name, None)
         try:
-            obj = list(getattr(structure_wrapper, maintainable_wrapper))[0]
+            obj = list(getattr(structure_container, maintainables))[0]
         except (IndexError, KeyError, AttributeError):
             self._context.result.status_message.update(
                 'Failure', 
@@ -601,7 +435,7 @@ class MaintainableSerializer(VersionableSerializer):
         else:
             return obj
 
-    def get_external(self):
+    def get_external_maintainable(self):
         location = self.structure_url
         if not location:
             self._context.result.status_message.update(
@@ -609,33 +443,34 @@ class MaintainableSerializer(VersionableSerializer):
                 status.FIESTA_2103_SOAP_PULLING_NOT_IMPLEMENTED
             ) 
             return
-        message = XMLParser().get(location)
+        header = self.create_structure_header()
+        message = ExternalRequest(header).get(location)
         if not isinstance(message, StructureSerializer):
             self._context.result.status_message.update(
                 'Failure', 
                 status.FIESTA_2201_PULLED_NOT_STRUCTURE
             ) 
             return
-        obj = self._get_maintainable(message.structures)
+        obj = self.extract_maintainable(message.structures)
         if not obj: return
         obj_stub = (obj.agency_id, obj.object_id, obj.version) 
         self_stub = (self.agency_id, self.object_id, self.version)
         if obj_stub != self_stub:
             self._context.result.status_message.update(
                 'Failure', 
-                status.FIESTA_2203_PULLED_UNEXPECTED_CONTENT) 
+                status.FIESTA_2203_PULLED_UNEXPECTED_CONTENT)
             return
         return obj
 
     def to_reference(self):
-        ref = RefSerializer(
+        ref = MaintainableRefSerializer(
             agency_id=self.agency_id,
             object_id=self.object_id,
             version=self.version,
             cls=self._meta.class_name,
             package=self._meta.app
         )
-        reference =  ReferenceSerializer(ref=ref)
+        reference =  MaintainableReferenceSerializer(ref=ref)
         reference.durn = reference.make_maintainable_urn()
         return reference
 
@@ -643,16 +478,16 @@ class MaintainableSerializer(VersionableSerializer):
         reference = self.to_reference()
         submitted_structure = SubmittedStructureSerializer(
             maintainable_object=reference, 
-            action=self._wrapper._wrapper.action, 
-            external_dependencies=self._wrapper._wrapper.external_dependencies
+            action=self._context.action, 
+            external_dependencies=self._context.external_dependencies
         )
         submission_result = submitted_structure.to_result()
-        submission_result._wrapper = self._wrapper._wrapper._obj
+        submission_result._container = self._container._container
         return submission_result
 
     def process_prevalidate(self):
         self._context.result = self.get_or_add_result(self.to_submission_result())
-        model = apps.get_model('base', 'Organisation')
+        model = apps.get_model('base', 'agency')
         try:
             self.agency = model.objects.get(object_id=self.agency_id)
         except model.DoesNotExist:
@@ -664,7 +499,7 @@ class MaintainableSerializer(VersionableSerializer):
 
     def process_premake(self):
         if self.is_external_reference:
-            sdmxobj = self.get_external()
+            sdmxobj = self.get_external_maintainable()
             if not sdmxobj:
                 self._stop = True
                 return
@@ -674,12 +509,12 @@ class MaintainableSerializer(VersionableSerializer):
             object_id=self.object_id,
             version=self.version
         )
-        self._meta.models.objects.reset_latest(created, self)
+        self._created = created
         return obj 
 
     def process_validate(self, obj):
-        action = self._context.action
-        if action in ['Replace', 'Delete']:
+        action = self._result.submitted_structure.action
+        if action == 'Delete':
             if obj.is_final:
                 self._context.result.status_message.update(
                     'Failure',
@@ -687,23 +522,123 @@ class MaintainableSerializer(VersionableSerializer):
                 ) 
                 self._stop = True
             else:
-                if action == 'Delete':
+                try:
                     obj.delete()
+                except ProtectedError:
+                    self._context.result.status_message.update(
+                        'Failure',
+                        status.FIESTA_2104_PROTECTED
+                    ) 
+                else:
                     self._context.result.status_message.update(
                         'Success',
                     ) 
-                    self._stop = True
+                self._stop = True
+        elif action == 'Update':
+            if not self._created:
+                self._context.result.status_message.update(
+                    'Failure',
+                    status.FIESTA_2102_APPENDING_NOT_ALLOWED,
+                )
+                self._stop = True
 
     def process_postmake(self, obj):
         obj = super().process_postmake(obj)
         if not obj.is_final:
             obj.is_final = self.is_final
         self._context.result.status_message.update('Success')
-        obj.submitted_structure = self._context.result.process(context=self._context)
+        obj.submitted_structure.add(self._context.result.process(context=self._context))
         return obj
 
 class ItemSchemeSerializer(MaintainableSerializer):
     is_partial: bool = field(is_attribute=True, default=False)
+
+    @cached_property
+    def items_as_dict(self):
+        items = {i.object_id : i for i in self.items}
+        self.items = items
+        return self.items
+    
+    def __getattr__(self, name):
+        return self.__getitem__(name)
+
+    def __getitem__(self, name):
+        return self.items_as_dict[name]
+
+    def __iter__(self):
+        if not isinstance(self.items, dict):
+            return self.items
+        return iter(self.items.values())
+
+    def __len__(self):
+        return len(self.items_as_dict)
+
+    def __contains__(self, item):
+        return item in self.items_as_dict.values()
+
+    def __eq__(self, other):
+        if not super().__eq__(other): return
+        if self.is_partial or other.is_partial: return
+        return set(self.items_as_dict) == set(other.items_as_dict)
+
+    def __le__(self, other):
+        if not super().__le__(other): return
+        if self.is_partial or other.is_partial: return
+        return set(self.items_as_dict) <= set(other.items_as_dict)
+
+    def __lt__(self, other):
+        if not super().__le__(other): return
+        if self.is_partial or other.is_partial: return
+        return set(self.items_as_dict) < set(other.items_as_dict)
+
+    def __gt__(self, other):
+        if not super().__le__(other): return
+        if self.is_partial or other.is_partial: return
+        return set(self.items_as_dict) > set(other.items_as_dict)
+
+    def __ge__(self, other):
+        if not super().__le__(other): return
+        if self.is_partial or other.is_partial: return
+        return set(self.items_as_dict) >= set(other.items_as_dict)
+
+    def __sub__(self, other):
+        if not self >= other: return
+        sub = self.copy()
+        sub.items = [i for i in self if i not in other]
+
+
+class ItemWithParentSchemeSerializer(ItemSchemeSerializer):
+
+    def __eq__(self, other):
+        if not super().__eq__(other): return
+        for key, val in self.items_as_dict.items():
+            if not val == other.items_as_dict[key]: return 
+        return True
+
+    def __le__(self, other):
+        if not super().__le__(other): return
+        for key, val in self.items_as_dict.items():
+            if not val == other.items_as_dict[key]: return 
+        return True
+
+    def __lt__(self, other):
+        if not super().__lt__(other): return
+        for key, val in self.items_as_dict.items():
+            if not val == other.items_as_dict[key]: return 
+        return True
+
+    def __gt__(self, other):
+        if not super().__gt__(other): return
+        for key, val in other.items_as_dict.items():
+            if not val == self.items_as_dict[key]: return 
+        return True
+
+    def __ge__(self, other):
+        if not super().__ge__(other): return
+        for key, val in other.items_as_dict.items():
+            if not val == self.items_as_dict[key]: return 
+        return True
+
 
 class StructuresItemsSerializer(Serializer):
 
@@ -722,12 +657,24 @@ class StructuresItemsSerializer(Serializer):
             maintainable_type = f.type.__args__[0]
             if maintainable_type not in context.queries: continue
             query = context.queries[maintainable_type]
-            setattr(self, f.name, maintainable_type.generate_many(query))
+            setattr(self, f.name, maintainable_type.generate_restful_many(query))
 
-class BaseItemSerializer(NameableSerializer):
-    parent: ReferenceSerializer = field(namespace_key='common')
+class ItemSerializer(NameableSerializer):
+    pass
 
-class ItemSerializer(BaseItemSerializer):
+class ItemWithParentSerializer(ItemSerializer):
+    parent: LocalReferenceSerializer = field(namespace_key='common')
+
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        if self._instance:
+            parent = self._instance.get_parent()
+            self.parent = LocalReferenceSerializer(parent)
+
+    def __eq__(self, other):
+        if not super().__eq__(other): return
+        return self.parent == other.parent
+        
 
     def get_parent(self, parent_id):
         return self._meta.model.objects.get(object_id=parent_id,
@@ -753,50 +700,202 @@ class ItemSerializer(BaseItemSerializer):
             parent=self._parent_obj
         )
 
-class ManyToManyItemSerializer(ItemSerializer):
 
-    def get_parent(self, parent_id):
-        return self._meta.model.objects.get(object_id=parent_id)
-
-    def process_prevalidate(self):
-        super().process_prevalidate()
-        if self._parent_obj:
-            if self._wrapper._obj not in self._parent_obj.wrappers:
-                self._context.status_message.update(
-                    'Warning',
-                    status.FIESTA_2405_PARENT_NOT_IN_SCHEME
-                )
-    
-class OrganisationSerializer(ManyToManyItemSerializer):
-    contact: Iterable[ContactSerializer] = field()
+class AgencySerializer(ItemSerializer):
+    contact: List[ContactSerializer] = field()
 
     class Meta:
-        # app_name = 'base'
-        # model_name = 'organisation'
+        app_name = 'base'
+        model_name = 'agency'
         namespace_key = 'structure'
 
-class AgencySerializer(OrganisationSerializer):
-    pass
+    def __post_init(self, *args, **kwargs):
+        super().__post_init__(*args, **kwargs)
+        if self._instance:
+            self.object_id = self.extract_object_id()
 
-class DataProviderSerializer(OrganisationSerializer):
-    pass
+    def extract_object_id(self):
+        if not '.' in self.object_id: return self.object_id
+        return self.object_id.split('.')[-1]
 
-class DataConsumerSerializer(OrganisationSerializer):
-    pass
-
-class OrganisationUnitSerializer(OrganisationSerializer):
-    pass
-
-class OrganisationSchemeSerializer(ItemSchemeSerializer):
+class DataProviderContactTelephoneSerializer(SimpleStringContactSerializer):
 
     class Meta:
-        # app_name = 'base'
-        # model_name = 'organisationscheme'
+        app_name = 'base'
+        model_name = 'dataprovidercontacttelephone'
+
+
+class DataProviderContactFaxSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataprovidercontactfax'
+
+class DataProviderContactX400Serializer(SimpleStringContactSerializer):
+    pass
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataprovidercontactx400'
+
+class DataProviderContactURISerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataprovidercontacturi'
+
+class DataProviderContactEmailSerializer(SimpleStringContactSerializer):
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataprovidercontactemail'
+
+class DataProviderContactSerializer(BaseContactSerializer):
+    telephone: Iterable[DataProviderContactTelephoneSerializer] = field(forward_accesor='dataprovidercontacttelephone_set')
+    fax: Iterable[DataProviderContactFaxSerializer] = field(forward_accesor='dataprovidercontactfax_set')
+    x400: Iterable[DataProviderContactX400Serializer] = field(forward_accesor='dataprovidercontactx400_set')
+    uri: Iterable[DataProviderContactURISerializer] = field(localname='URI', forward_accesor='dataprovidercontacturi_set')
+    email: Iterable[DataProviderContactEmailSerializer] = field(forward_accesor='dataprovidercontactemail_set')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataprovidercontact'
+        namespace_key = 'message'
+
+class DataProviderSerializer(ItemSerializer):
+    contact: Iterable[DataProviderContactSerializer] = field(forward_accesor='dataprovidercontact_set')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataprovider'
+        namespace_key = 'structure'
+
+class DataConsumerContactTelephoneSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumercontacttelephone'
+
+
+class DataConsumerContactFaxSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumercontactfax'
+
+class DataConsumerContactX400Serializer(SimpleStringContactSerializer):
+    pass
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumercontactx400'
+
+class DataConsumerContactURISerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumercontacturi'
+
+class DataConsumerContactEmailSerializer(SimpleStringContactSerializer):
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumercontactemail'
+
+class DataConsumerContactSerializer(BaseContactSerializer):
+    telephone: Iterable[DataConsumerContactTelephoneSerializer] = field(forward_accesor='dataconsumercontacttelephone_set')
+    fax: Iterable[DataConsumerContactFaxSerializer] = field(forward_accesor='dataconsumercontactfax_set')
+    x400: Iterable[DataConsumerContactX400Serializer] = field(forward_accesor='dataconsumercontactx400_set')
+    uri: Iterable[DataConsumerContactURISerializer] = field(localname='URI', forward_accesor='dataconsumercontacturi_set')
+    email: Iterable[DataConsumerContactEmailSerializer] = field(forward_accesor='dataconsumercontactemail_set')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumercontact'
+        namespace_key = 'message'
+
+class DataConsumerSerializer(ItemSerializer):
+    contact: Iterable[DataConsumerContactSerializer] = field(forward_accesor='dataconsumercontact_set')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumer'
+        namespace_key = 'structure'
+
+class OrganisationUnitContactTelephoneSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunitcontacttelephone'
+
+
+class OrganisationUnitContactFaxSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunitcontactfax'
+
+class OrganisationUnitContactX400Serializer(SimpleStringContactSerializer):
+    pass
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunitcontactx400'
+
+class OrganisationUnitContactURISerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunitcontacturi'
+
+class OrganisationUnitContactEmailSerializer(SimpleStringContactSerializer):
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunitcontactemail'
+
+class OrganisationUnitContactSerializer(BaseContactSerializer):
+    telephone: Iterable[OrganisationUnitContactTelephoneSerializer] = field(forward_accesor='organisationunitcontacttelephone_set')
+    fax: Iterable[OrganisationUnitContactFaxSerializer] = field(forward_accesor='organisationunitcontactfax_set')
+    x400: Iterable[OrganisationUnitContactX400Serializer] = field(forward_accesor='organisationunitcontactx400_set')
+    uri: Iterable[OrganisationUnitContactURISerializer] = field(localname='URI', forward_accesor='organisationunitcontacturi_set')
+    email: Iterable[OrganisationUnitContactEmailSerializer] = field(forward_accesor='organisationunitcontactemail_set')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunitcontact'
+        namespace_key = 'message'
+
+class OrganisationUnitSerializer(ItemWithParentSerializer):
+    contact: Iterable[OrganisationUnitContactSerializer] = field(forward_accesor='organisationunitcontact_set')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'organisationunit'
+        namespace_key = 'structure'
+
+class AgencySchemeSerializer(ItemSchemeSerializer):
+    items: Iterable[AgencySerializer] = field(localname='agency') 
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'agency'
         namespace_key = 'structure'
         structures_field_name = 'organisation_schemes'
 
-class AgencySchemeSerializer(OrganisationSchemeSerializer):
-    agency: Iterable[AgencySerializer] = field() 
+    def __post_init__(self, *args, **kwargs):
+        super.__post_init__(*args, **kwargs)
+        if self._instance:
+            self.description = None
+            self.annotations = None
+            self.name = (
+                TextSerializer(lang=lang, text=f"{self.object_id} {_('Agency scheme')}") for lang in settings.LANGUAGES
+            )
+            if self.object_id == 'SDMX':
+                self.agency = (
+                    AgencySerializer(instance) for instance in self._meta.model.get_rood_nodes() 
+                )
+            else:
+                self.agency = (
+                    AgencySerializer(instance) for instance in self._instance.get_children()
+                )
 
     @classmethod
     def make_root_query(cls, context):
@@ -808,25 +907,13 @@ class AgencySchemeSerializer(OrganisationSchemeSerializer):
         else: root = root & Q(object_id='AGENCIES')
         return root
 
-class DataConsumerSchemeSerializer(OrganisationSchemeSerializer):
-    data_consumer: Iterable[DataConsumerSerializer] = field(namespace_key='structure') 
-
-    @classmethod
-    def make_root_query(cls, context):
-        root = super().make_root_query(context)
-        root_args = dict(*root.children)
-        resource_id = root_args.get('object_id')
-        if resource_id and resource_id != 'DATA_CONSUMERS':
-            raise ParseError('The resourceID of an dataconsumerscheme query must be equal to DATA_CONSUMERS if set')
-        else: root = root & Q(object_id='DATA_CONSUMERS')
-        return root
-
-class DataProviderSchemeSerializer(OrganisationSchemeSerializer):
-    data_provider: Iterable[DataProviderSerializer] = field(namespace_key='structure') 
+        
+class DataProviderSchemeSerializer(MaintainableSerializer):
+    data_provider: Iterable[DataProviderSerializer] = field(forward_accesor='dataprovider_set') 
 
     class Meta:
-        # app_name = 'base'
-        # model_name = 'organisationscheme'
+        app_name = 'base'
+        model_name = 'dataproviderscheme'
         namespace_key = 'structure'
         structures_field_name = 'organisation_schemes'
         parents_names = ['ProvisionAgreementSerializer', 'ContentConstraintSerializer']
@@ -854,8 +941,27 @@ class DataProviderSchemeSerializer(OrganisationSchemeSerializer):
         else: root = root & Q(object_id='DATA_PROVIDERS')
         return root
 
-class OrganisationUnitSchemeSerializer(OrganisationSchemeSerializer):
-    organisation_unit: Iterable[OrganisationUnitSerializer] = field(namespace_key='structure') 
+class DataConsumerSchemeSerializer(MaintainableSerializer):
+    data_consumer: Iterable[DataConsumerSerializer] = field(forward_accesor='dataconsumer_set') 
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'dataconsumerscheme'
+        namespace_key = 'structure'
+        structures_field_name = 'organisation_schemes'
+    @classmethod
+    def make_root_query(cls, context):
+        root = super().make_root_query(context)
+        root_args = dict(*root.children)
+        resource_id = root_args.get('object_id')
+        if resource_id and resource_id != 'DATA_CONSUMERS':
+            raise ParseError('The resourceID of an dataconsumerscheme query must be equal to DATA_CONSUMERS if set')
+        else: root = root & Q(object_id='DATA_CONSUMERS')
+        return root
+
+
+class OrganisationUnitSchemeSerializer(ItemWithParentSchemeSerializer):
+    items: Iterable[OrganisationUnitSerializer] = field(localname='OrganisationUnit', namespace_key='structure') 
 
 class OrganisationSchemesSerializer(StructuresItemsSerializer):
     agency_scheme: Iterable[AgencySchemeSerializer] = field()
@@ -867,15 +973,174 @@ class OrganisationSchemesSerializer(StructuresItemsSerializer):
         app_name = 'base'
         namespace_key = 'structure'
 
-class CodeSerializer(ItemSerializer):
+class TelephoneSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'telephone'
+
+class FaxSerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'fax'
+
+class X400Serializer(SimpleStringContactSerializer):
+    pass
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'x400'
+
+class URISerializer(SimpleStringContactSerializer):
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'uri'
+
+class EmailSerializer(SimpleStringContactSerializer):
+    class Meta:
+        app_name = 'registry'
+        model_name = 'email'
+
+class ContactSerializer(BaseContactSerializer):
+    telephone: Iterable[TelephoneSerializer] = field()
+    fax: Iterable[FaxSerializer] = field()
+    x400: Iterable[X400Serializer] = field()
+    uri: Iterable[URISerializer] = field(localname='URI')
+    email: Iterable[EmailSerializer] = field()
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'contact'
+        namespace_key = 'message'
+
+class HeaderContactSerializer(BaseContactSerializer):
+
+    def process_premake(self):
+        return self._meta.model.objects.create(
+            party=self._container._obj
+        )
+
+    def process_postmake(self, obj):
+        for f in ['name', 'department', 'role']: 
+            self.update_translateable(obj, f)
+
+
+class PartySerializer(Serializer):
+
+    name: Iterable[TextSerializer] = field(namespace_key='common')
+    contact: Iterable[HeaderContactSerializer] = field()
+    object_id: str = field(is_attribute=True, localname='id')
+    timezone: str = field(namespace_key='message')
+
+    class Meta:
+        app_name = 'base'
+        model_name = 'Party'
+        namespace_key = 'message'
+
+    def process_premake(self):
+        obj = self._meta.model.objects.create(
+            object_id=self.object_id,
+            timezone=self.timezone
+        )
+        self.update_translateable(obj, 'name')
+        return obj
+
+    def wsrest_party(self, registration):
+        if isinstance(registration.user, AnonymousUser):
+            self.object_id='not_supplied'
+            return
+        contact = HeaderContactSerializer(email=[registration.user.username])
+        receiver = registration.user.contact.organisation
+        self.object_id = receiver.object_id
+        self.contact = [contact]
+
+    def wsrest_sender(self):
+        self.object_id = api_settings.DEFAULT_SENDER_ID 
+
+
+class PayloadStructureSerializer(Serializer):
+    provision_agreement: ReferenceSerializer = field()
+    structure_usage: ReferenceSerializer = field()
+    structure: ReferenceSerializer = field()
+    structure_id: str = field(is_attribute=True, localname='structureID')
+    schema_url: str = field(is_attribute=True, localname='schemaURL')
+    namespace: str = field(is_attribute=True)
+    dimension_at_observation: str = field(is_attribute=True)
+    explicit_measures: str = field(is_attribute=True)
+    service_url: str = field(localname='serviceURL', is_attribute=True)
+    structure_url: str = field(localname='structureURL', is_attribute=True)
+
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'PayloadStructure'
+        namespace_key = 'common'
+
+class HeaderSerializer(Serializer):
+    object_id: str = field(localname='ID')
+    test: bool = field(default=False)
+    prepared: datetime = field()
+    sender: PartySerializer = field()
+    receiver: PartySerializer = field()
+    name: Iterable[TextSerializer] = field(namespace_key='common')
+    structure: Iterable[PayloadStructureSerializer] = field()
+    data_provider: ItemReferenceSerializer = field()
+    data_set_action: str = field()
+    data_set_id: str = field(localname='DataSetID')
+    extracted: datetime = field()
+    reporting_begin: str = field()
+    reporting_end: str = field()
+    embargo_date: datetime = field()
+    source: str = field()
+
+    class Meta:
+        app_name = 'registry'
+        model_name = 'Header'
+        namespace_key = 'message'
+
+    def process_postmake(self, obj):
+        obj = self._meta.model.objects.create(
+            log=self._context.log,
+            object_id=self.object_id,
+            test=self.test,
+            prepared=self.prepared,
+            sender=self.m_sender,
+            receiver=self.m_receiver,
+        )
+        self._sid = transaction.savepoint()
+        return obj
+
+    def to_response(self):
+        header = HeaderSerializer(
+            object_id=self._obj.id,
+            test=self.test,
+            prepared=datetime.now(),
+            sender=self.receiver,
+            receiver=self.sender,
+        )
+        if self.test:
+            transaction.savepoint_rollback(self._sid)
+        return header 
+
+    def to_structure(self, log):
+        self.object_id=log.restful_query.id,
+        self.test=False,
+        self.prepared=log.prepared,
+        self.sender=PartySerializer().wsrest_sender(),
+        self.receiver=PartySerializer().wsrest_party(log.restful_query),
+
+
+class CodeSerializer(ItemWithParentSerializer):
 
     class Meta:
         app_name = 'codelist'
         model_name = 'code'
         namespace_key = 'structure'
 
-class CodelistSerializer(ItemSchemeSerializer):
-    code: Iterable[CodeSerializer] = field() 
+class CodelistSerializer(ItemWithParentSchemeSerializer):
+    items: Iterable[CodeSerializer] = field(localname='Code') 
 
     class Meta:
         app_name ='codelist'
@@ -930,12 +1195,12 @@ class FormatSerializer(Serializer):
 
 class RepresentationSerializer(Serializer):
     text_format: FormatSerializer = field()
-    enumeration: ReferenceSerializer = field()
+    enumeration: MaintainableReferenceSerializer = field()
     enumeration_format: FormatSerializer = field()
 
     class Meta:
         app_name ='common' 
-        # model_name = 'representation'
+        model_name = 'representation'
         namespace_key = 'common'
 
             
@@ -969,7 +1234,7 @@ class ISOConceptReferenceSerializer(Serializer):
             **asdict(self))
         return obj
 
-class ConceptSerializer(ItemSerializer):
+class ConceptSerializer(ItemWithParentSerializer):
     core_representation: RepresentationSerializer = field()
     iso_concept_reference: ISOConceptReferenceSerializer = field(localname='ISOConceptReference')
 
@@ -988,7 +1253,7 @@ class ConceptSerializer(ItemSerializer):
         return obj
 
 
-class ConceptSchemeSerializer(ItemSchemeSerializer):
+class ConceptSchemeSerializer(MaintainableSerializer):
     concept: Iterable[ConceptSerializer] = field() 
 
     class Meta:
@@ -1027,7 +1292,7 @@ class ConceptsSerializer(StructuresItemsSerializer):
     concept_scheme: Iterable[ConceptSchemeSerializer] = field()
 
 class ComponentSerializer(IdentifiableSerializer):
-    concept_identity: ReferenceSerializer = field()
+    concept_identity: ItemReferenceSerializer = field()
     local_representation: RepresentationSerializer = field()
 
     class Meta:
@@ -1047,8 +1312,8 @@ class ComponentSerializer(IdentifiableSerializer):
         return obj
 
 class DimensionSerializer(ComponentSerializer):
-    measure_local_representation: ReferenceSerializer = field(localname='local_representation') 
-    concept_role: Iterable[ReferenceSerializer] = field(related_name='concept_role')
+    measure_local_representation: MaintainableReferenceSerializer = field(localname='local_representation') 
+    concept_role: Iterable[ItemReferenceSerializer] = field(related_name='concept_role')
     position: int = field(is_attribute=True)
     tipe: str = field(localname='type', is_attribute=True)
 
@@ -1067,6 +1332,8 @@ class DimensionSerializer(ComponentSerializer):
                     self.tipe = 'MeasureDimension'
                 else:
                     self.tipe = 'TipeDimension'
+        if self._instance:
+            self.tipe = self._instance.TYPE_CHOICES[self.tipe]
         if self.tipe == 'MeasureDimension':
             self.local_representation = self.measure_local_representation
             self.measure_local_representation = None
@@ -1085,7 +1352,7 @@ class DimensionSerializer(ComponentSerializer):
         return lxml.etree.Element(tag, attrib=attrib, nsmap=self._meta.nsmap)
 
 class GroupDimensionSerializer(AnnotableSerializer):
-    dimension_reference: ReferenceSerializer = field()
+    dimension_reference: LocalReferenceSerializer = field()
 
     class Meta:
         app_name = 'datastructure'
@@ -1114,10 +1381,10 @@ class PrimaryMeasureSerializer(ComponentSerializer):
 class AttributeRelationshipSerializer(Serializer):
 
     null: EmptySerializer = field(localname='None', default=False)
-    dimension: Iterable[ReferenceSerializer] = field(related_name='dimension_set')
-    attachment_group: Iterable[ReferenceSerializer] = field(related_name='attachment_group')
-    group: ReferenceSerializer = field()
-    primary_measure: ReferenceSerializer = field()
+    dimension: Iterable[LocalReferenceSerializer] = field(related_name='dimension_set')
+    attachment_group: Iterable[LocalReferenceSerializer] = field(related_name='attachment_group')
+    group: LocalReferenceSerializer = field()
+    primary_measure: Iterable[LocalReferenceSerializer] = field()
 
     class Meta:
         app_name = 'datastructure'
@@ -1141,14 +1408,18 @@ class AttributeRelationshipSerializer(Serializer):
         return obj
 
 class AttributeSerializer(ComponentSerializer):
-    concept_role: Iterable[ReferenceSerializer] = field(related_name='concept_role')
-    attribute_relationship: AttributeRelationshipSerializer = field()
+    concept_role: Iterable[ItemReferenceSerializer] = field(related_name='concept_role')
+    attribute_relationship: AttributeRelationshipSerializer = field(forward_accesor='attributerelationship')
     assignment_status: str = field(is_attribute=True) 
 
     class Meta:
         app_name = 'datastructure'
         namespace_key = 'structure'
         model_name = 'attribute'
+
+    def __post_init__(self, *args, **kwargs):
+        if self._instance:
+            self.assignment_status = self._instance.ASSIGNMENT_STATUS_CHOICES[self.assignment_status]
 
 
     def process_postmake(self, obj):
@@ -1194,11 +1465,10 @@ class DimensionListSerializer(ComponentListSerializer):
         super().__post_init__(*args, **kwargs)
         self.object_id = 'DimensionDescriptor'
 
-
 class GroupSerializer(ComponentListSerializer):
 
     group_dimension: Iterable[GroupDimensionSerializer] = field()
-    attachment_constraint: ReferenceSerializer = field()
+    attachment_constraint: MaintainableReferenceSerializer = field()
 
     class Meta:
         app_name = 'datastructure'
@@ -1236,10 +1506,10 @@ class AttributeListSerializer(ComponentListSerializer):
         self.object_id = 'AttributeDescriptor'
 
 class DataStructureComponentsSerializer(Serializer):
-    dimension_list: DimensionListSerializer = field()
+    dimension_list: DimensionListSerializer = field(forward_accesor='dimensionlist')
     group: Iterable[GroupSerializer] = field()
-    measure_list: MeasureListSerializer = field()
-    attribute_list: AttributeListSerializer = field()
+    measure_list: MeasureListSerializer = field(forward_accesor='measurelist')
+    attribute_list: AttributeListSerializer = field(forward_accesor='attributelist')
 
     class Meta:
         app_name = 'datastructure'
@@ -1391,13 +1661,16 @@ class ProvisionAgreementSerializer(MaintainableSerializer):
 class ProvisionAgreementsSerializer(StructuresItemsSerializer):
     provision_agreement: Iterable[ProvisionAgreementSerializer] = field()
 
-class AttachmentConstraintAttachmentSerializer(BaseStructureSerializer):
+class AttachmentConstraintAttachmentSerializer(Serializer):
     # Attachment constraints not attached to structural metadata (DSD) 
     # are of no use since groups and their association to attachment
     # constraints must be defined in structural metadata (DSD) and be given a unique identifier,
     # thus should be attached to datastructure 
 
-    data_structure: Iterable[ReferenceSerializer] = field(related_name='datastructure_set')
+    data_structure: Iterable[MaintainableReferenceSerializer] = field(related_name='datastructure_set', FormatSerializer='data_structures')
+
+    class Meta:
+        namespace_key = 'structure'
 
     def process_postvalidate(self, obj): 
         super().process_postvalidate(obj)
@@ -1414,14 +1687,14 @@ class AttachmentConstraintAttachmentSerializer(BaseStructureSerializer):
                     item._obj.attachment_constraint.add(obj)
         return obj
 
-class ContentConstraintAttachmentSerializer(BaseStructureSerializer):
-    #TODO Most likely will never implement content constraints attached to DataSet and SimpleDataSource since I don't see envision a demand for them
+class ContentConstraintAttachmentSerializer(Serializer):
+    #TODO Most likely will never implement content constraints attached to DataSet and SimpleDataSource since I don't see a demand for them
     #TODO Most likely will never implement content constraints attached to Queryable artefacts since SOAP web service is not implemented
 
-    data_provider: ReferenceSerializer = field()
-    data_structure: Iterable[ReferenceSerializer] = field()
-    dataflow: Iterable[ReferenceSerializer] = field()
-    provision_agreement: Iterable[ReferenceSerializer] = field()
+    data_provider: ItemReferenceSerializer = field()
+    data_structure: Iterable[MaintainableReferenceSerializer] = field(forward_accesor='data_structures')
+    dataflow: Iterable[MaintainableReferenceSerializer] = field(forward_accesor='dataflows')
+    provision_agreement: Iterable[MaintainableReferenceSerializer] = field(forward_accesor='provision_agreements')
 
     class Meta:
         namespace_key = 'structure'
@@ -1468,8 +1741,8 @@ class CubeRegionKeyValueSerializer(BaseSubKeySerializer):
             value=self.value.text
         )
 
-class KeySerializer(BaseStructureSerializer):
-    sub_key: Iterable[SubKeySerializer] = field()
+class KeySerializer(Serializer):
+    sub_key: Iterable[SubKeySerializer] = field(forward_accesor='subkey_set')
 
     class Meta:
         app_name = 'registry'
@@ -1482,6 +1755,7 @@ class KeySerializer(BaseStructureSerializer):
         )
 
 class TimePeriodSerializer(StringSerializer):
+    time_period: str = field(is_text=True)
     is_inclusive: bool = field(is_attribute=True, default=True)
 
     class Meta:
@@ -1516,10 +1790,10 @@ class TimeRangeSerializer(CommonSerializer):
         )
         return obj
 
-class CubeRegionKeySerializer(CommonSerializer):
+class CubeRegionKeySerializer(Serializer):
     component_id: str = field(is_attribute=True, localname='id')
-    value: Iterable[ValueSerializer] = field()
-    time_range: TimeRangeSerializer = field()
+    value: Iterable[ValueSerializer] = field(forward_accesor='cuberegionkeyvalue_set')
+    time_range: TimeRangeSerializer = field(forward_accesor='cuberegionkeytimerange')
 
     class Meta:
         app_name = 'registry'
@@ -1532,7 +1806,7 @@ class CubeRegionKeySerializer(CommonSerializer):
             component_id=self.component_id,
         )
 
-class DataKeySetSerializer(BaseStructureSerializer):
+class DataKeySetSerializer(Serializer):
     key: Iterable[KeySerializer] = field()
     is_included: bool = field(is_attribute=True)
 
@@ -1553,9 +1827,9 @@ class DataKeySetSerializer(BaseStructureSerializer):
                 is_included=self.is_included
             )
 
-class CubeRegionSerializer(CommonSerializer):
-    key_value: Iterable[CubeRegionKeySerializer] = field() 
-    attribute: Iterable[CubeRegionKeySerializer] = field() 
+class CubeRegionSerializer(Serializer):
+    key_value: Iterable[CubeRegionKeySerializer] = field(forward_accesor='key_value_set') 
+    attribute: Iterable[CubeRegionKeySerializer] = field(forward_accesor='attribute_set') 
     include: bool = field(is_attribute=True, default=True)
 
     class Meta:
@@ -1571,13 +1845,13 @@ class CubeRegionSerializer(CommonSerializer):
 
 class AttachmentConstraintSerializer(MaintainableSerializer):
     constraint_attachment: AttachmentConstraintAttachmentSerializer = field()
-    data_key_set: Iterable[DataKeySetSerializer] = field()
+    data_key_set: Iterable[DataKeySetSerializer] = field(forward_accesor='keyset_set')
 
     class Meta:
         app_name = 'registry'
         model_name = 'attachmentconstraint'
         namespace_key = 'structure'
-        children_names = ['DataStructureSerializer']
+        children_names = 'DataStructureSerializer'
         structures_field_name = 'constraints'
 
     @classmethod
@@ -1591,7 +1865,7 @@ class AttachmentConstraintSerializer(MaintainableSerializer):
             qlist.append(Q(datastructure__in=rel_objects.filter(rel_qry)))
         return functools.reduce(lambda x, y: x | y, qlist)
 
-class ReleaseCalendarSerializer(BaseStructureSerializer):
+class ReleaseCalendarSerializer(Serializer):
     periodicity: StringSerializer = field(is_text=True)
     offset: StringSerializer = field(is_text=True)
     tolerance: StringSerializer = field(is_text=True)
@@ -1609,11 +1883,26 @@ class ReleaseCalendarSerializer(BaseStructureSerializer):
         )
         return obj
 
+class ReferencePeriodSerializer(Serializer):
+    start_time: datetime = field()
+    end_time: datetime = field()
+
+    class Meta:
+        app_name = 'common'
+        model_name = 'referenceperiod'
+        namespace_key = 'common'
+
+    def process_premake(self):
+        obj, _ = self._meta.model.objects.get_or_create(
+            start_time = self.start_time,
+            end_time = self.end_time
+        )
+        return obj
 
 class ContentConstraintSerializer(MaintainableSerializer):
     constraint_attachment: ContentConstraintAttachmentSerializer = field()
-    data_key_set: Iterable[DataKeySetSerializer] = field()
-    cube_region: Iterable[CubeRegionSerializer] = field() 
+    data_key_set: Iterable[DataKeySetSerializer] = field(forward_accesor='keyset_set')
+    cube_region: Iterable[CubeRegionSerializer] = field(forward_accesor='cuberegion_set') 
     release_calendar: ReleaseCalendarSerializer = field()
     reference_period: ReferencePeriodSerializer = field()
     tipe: str = field(localname='type', is_attribute=True, default='Actual')
@@ -1760,7 +2049,7 @@ class StructureSerializer(BaseSDMXMessageSerializer):
             action='Replace',
             external_dependencies=True
         ) 
-        sender = SenderSerializer(object_id='ECB')
+        sender = PartySerializer(object_id='ECB')
         receiver = PartySerializer(object_id='FIESTA')
         header = HeaderSerializer(
             object_id='SID1',
@@ -1779,7 +2068,7 @@ class StructureSerializer(BaseSDMXMessageSerializer):
         self.header = HeaderSerializer().to_structure(context.log.restful_query)
 
 class SubmittedStructureSerializer(RegistrySerializer):
-    maintainable_object: ReferenceSerializer = field()
+    maintainable_object: MaintainableReferenceSerializer = field()
     action: str = field(is_attribute=True)
     external_dependencies: bool = field(is_attribute=True)
 
@@ -1794,10 +2083,10 @@ class SubmittedStructureSerializer(RegistrySerializer):
             status_message=StatusMessageSerializer()
         )
 
-class SubmitStructureRequestSerializer(RegistrySerializer):
+class SubmitStructureRequestSerializer(Serializer):
     structure_location: str = field() 
     structures: StructuresSerializer = field()
-    submitted_structure: Iterable[SubmittedStructureSerializer] = field()
+    submitted_structure: Iterable[SubmittedStructureSerializer] = field(forward_accesor='submittedstructure')
     action: str = field(is_attribute=True)
     external_dependencies: bool = field(is_attribute=True) 
 
@@ -1806,31 +2095,39 @@ class SubmitStructureRequestSerializer(RegistrySerializer):
         model_name = 'submitstructurerequest'
         namespace_key = 'registry'
 
+    def __post_init__(self, *args, **kwargs):
+        if self._instance:
+            self.action = self._instance.ACTION_CHOICES[self.action]
+
+
     def process_prevalidate(self):
         if not self.structures:
-            loc = self.structure_location
-            message = XMLParser().get(loc)
-            if not isinstance(message, StructureSerializer):
-                self._context.result.status_message.update(
-                    'Failure',
-                    status.FIESTA_2201_PULLED_NOT_STRUCTURE
+            header = self.create_structure_header()
+            try:
+                external_request = ExternalRequest(header)
+            except ExternalError:
+                self.m_header.delete()
+                raise
+            structure = external_request.get(self.structure_location)
+            if not isinstance(structure, StructureSerializer):
+                self.m_header.delete()
+                raise ExternalError(
+                    _('The message extracted from {} is not a structure message').format(self.structure_location)
                 )
             else:
-                self.structures = message.structures
-        if self._context.result.status_message.status == 'Failure':
-            self._stop = True 
+                self.structures = structure.structures
         self._context.action = self.action
         self._context.external_dependencies = self.external_dependencies
+        for submitted_structure in self.submitted_structure:
+            self._context.get_or_add_result(submitted_structure.to_result())
 
     def process_premake(self):
         obj = self._meta.model.objects.create(
             submission=self._wrapper.m_header,
             structure_location=self.structure_location,
-            action=self.action,
+            action=self._model.ACTION_CHOICES[self.action],
             external_dependencies=self.external_dependencies
         )
-        for submitted_structure in self.submitted_structure:
-            self._context.get_or_add_result(submitted_structure.to_result())
         return obj
 
     def to_response(self):
@@ -1848,7 +2145,7 @@ class StatusMessageTextSerializer(TextSerializer):
         )
         return obj
 
-class StatusMessageSerializer(RegistrySerializer):
+class StatusMessageSerializer(Serializer):
     message_text: Iterable[StatusMessageTextSerializer] = field()
     status: str = field(is_attribute=True)
 
@@ -1879,7 +2176,7 @@ class StatusMessageSerializer(RegistrySerializer):
             text = [TextSerializer(language, text_entry)]
         self.message_text.append(StatusMessageTextSerializer(text=text, code=message.code))
 
-class SubmissionResultSerializer(RegistrySerializer):
+class SubmissionResultSerializer(Serializer):
     submitted_structure: SubmittedStructureSerializer = field()
     status_message: StatusMessageSerializer = field()
 
@@ -1991,7 +2288,7 @@ class NotifyRegistryEventSerializer(RegistrySerializer):
     # registration_event: RegistrationEvent = field()
 
 class RegistryInterfaceSubmitStructureRequestSerializer(BaseSDMXMessageSerializer):
-    submit_structure_request: SubmitStructureRequestSerializer = field()
+    submit_structure_request: SubmitStructureRequestSerializer = field(forward_accesor='submitstructurerequest')
 
     def to_response(self):
         return RegistryInterfaceSubmitStructureResponseSerializer(
@@ -2027,7 +2324,7 @@ class RegistrationSerializer(RegistrySerializer):
     index_attributes: bool = field(is_attribute=True, default=False)
     index_reporting_period: bool = field(is_attribute=True, default=False)
 
-class RegistrationRequestSerializer(RegistrySerializer):
+class RegistrationRequestSerializer(Serializer):
     registration: RegistrationSerializer = field()
     action: str = field(is_attribute=True)
 

@@ -9,6 +9,25 @@ from ..common import abstract_models as common
 
 SMALL = api_settings.DEFAULT_SMALL_STRING
 
+class Annotation(common.Annotation):
+    concept_scheme = models.ForeignKey(
+        'conceptscheme.ConceptScheme',
+        on_delete=models.CASCADE,
+        verbose_name=_('Concept scheme'),
+        null=True,
+        blank=True,
+    )
+    concept = models.ForeignKey(
+        'conceptscheme.Concept',
+        on_delete=models.CASCADE,
+        verbose_name=_('Concept'),
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        abstract = True
+
 class ConceptReference(common.AbstractNCNameItemReference):
 
     class Meta(common.AbstractNCNameItemReference.Meta):
@@ -64,4 +83,3 @@ class ISOConceptReference(models.Model):
 
     class Meta:
         abstract = True
-

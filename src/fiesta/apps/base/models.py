@@ -3,7 +3,7 @@
 from oscar.core.loading import is_model_registered
 
 from .abstract_models import (
-    User, Agency, AgencyContact, AgencyContactTelephone, AgencyContactFax,
+    User, Annotation, Agency, AgencyContact, AgencyContactTelephone, AgencyContactFax,
     AgencyContactX400, AgencyContactEmail, AgencyContactURI,
     DataProviderScheme, DataProviderReference, DataProvider,
     DataProviderContact, DataProviderContactTelephone, DataProviderContactFax,
@@ -25,6 +25,14 @@ if not is_model_registered('base', 'User'):
         pass
 
     __all__.append('User')
+
+__all__ = []
+
+if not is_model_registered('base', 'Annotation'):
+    class Annotation(Annotation):
+        pass
+
+    __all__.append('Annotation')
 
 if not is_model_registered('base', 'Agency'):
     class Agency(Agency):
