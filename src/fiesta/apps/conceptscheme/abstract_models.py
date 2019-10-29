@@ -9,7 +9,7 @@ from ..common import abstract_models as common
 
 SMALL = api_settings.DEFAULT_SMALL_STRING
 
-class Annotation(common.Annotation):
+class Annotation(common.AbstractAnnotation):
     concept_scheme = models.ForeignKey(
         'conceptscheme.ConceptScheme',
         on_delete=models.CASCADE,
@@ -28,16 +28,6 @@ class Annotation(common.Annotation):
     class Meta:
         abstract = True
 
-class ConceptReference(common.AbstractNCNameItemReference):
-
-    class Meta(common.AbstractNCNameItemReference.Meta):
-        abstract = True
-
-class ConceptSchemeReference(common.AbstractReference):
-
-    class Meta(common.AbstractNCNameItemReference.Meta):
-        abstract = True
-
 class ConceptScheme(common.AbstractNCNameMaintainable):
 
     class Meta(common.AbstractNCNameMaintainable.Meta):
@@ -52,16 +42,18 @@ class Concept(common.AbstractNCNameItemWithParent):
         verbose_name=_('Concept scheme')
     )
     core_representation = models.ForeignKey(
-        'codelist.CodelistReference', 
+        'common.Representation', 
         on_delete=models.PROTECT,
-        verbose_name=_('Core representation')
+        verbose_name=_('Core representation'),
+        null=True,
+        blank=True
     )
     iso_concept_reference = models.ForeignKey(
-        'ISOConceptReference', 
+        'conceptscheme.ISOConceptReference', 
         null=True, 
         blank=True, 
         on_delete=models.PROTECT,
-        verbose_name=_('ISO concept reference')
+        verbose_name=_('ISO concept')
     )
 
     class Meta(common.AbstractNCNameItemWithParent.Meta):

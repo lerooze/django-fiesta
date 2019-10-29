@@ -1,13 +1,30 @@
-from fiesta.apps.registry.abstract_models import (
-    Log, SubmitStructureRequest, SubmittedStructure, StatusMessage, ErrorCode,
-    Header, Structure, Party, Contact, Telephone, Fax, X400, Email, URI,
-    Annotation, ProvisionAgreementReference, ProvisionAgreement,
-    AttachmentConstraintReference, AttachmentConstraint,
-    ContentConstraintReference, ContentConstraint, KeySet, Key, SubKey,
-    CubeRegion, CubeRegionKey, CubeRegionKeyValue, CubeRegionKeyTimeRange,
-    TimePeriod, ReleaseCalendar   
+# models.py
+
+from ...core.loading import is_model_registered
+
+from .abstract_models import (
+    Log, 
+    SubmitStructureRequest, 
+    SubmittedStructure, 
+    StatusMessage, 
+    ErrorCode,
+    Header, 
+    PayloadStructure, 
+    Party, 
+    Annotation, 
+    ProvisionAgreement,
+    VersionDetail,
+    AttachmentConstraint,
+    ContentConstraint, 
+    KeySet, 
+    Key, 
+    SubKey,
+    CubeRegion, 
+    CubeRegionKey,
+    CubeRegionKeyValue, 
+    CubeRegionKeyTimeRange,
+    TimePeriod
 )
-from oscar.core.loading import is_model_registered
 
 __all__ = []
 
@@ -47,11 +64,11 @@ if not is_model_registered('registry', 'Header'):
 
     __all__.append('Header')
 
-if not is_model_registered('registry', 'Structure'):
-    class Structure(Structure):
+if not is_model_registered('registry', 'PayloadStructure'):
+    class PayloadStructure(PayloadStructure):
         pass
 
-    __all__.append('Structure')
+    __all__.append('PayloadStructure')
 
 if not is_model_registered('registry', 'Party'):
     class Party(Party):
@@ -59,53 +76,11 @@ if not is_model_registered('registry', 'Party'):
 
     __all__.append('Party')
 
-if not is_model_registered('registry', 'Contact'):
-    class Contact(Contact):
-        pass
-
-    __all__.append('Contact')
-
-if not is_model_registered('registry', 'Telephone'):
-    class Telephone(Telephone):
-        pass
-
-    __all__.append('Telephone')
-
-if not is_model_registered('registry', 'Fax'):
-    class Fax(Fax):
-        pass
-
-    __all__.append('Fax')
-
-if not is_model_registered('registry', 'X400'):
-    class X400(X400):
-        pass
-
-    __all__.append('X400')
-
-if not is_model_registered('registry', 'Email'):
-    class Email(Email):
-        pass
-
-    __all__.append('Email')
-
-if not is_model_registered('registry', 'URI'):
-    class URI(URI):
-        pass
-
-    __all__.append('URI')
-
 if not is_model_registered('registry', 'Annotation'):
     class Annotation(Annotation):
         pass
 
     __all__.append('Annotation')
-
-if not is_model_registered('registry', 'ProvisionAgreementReference'):
-    class ProvisionAgreementReference(ProvisionAgreementReference):
-        pass
-
-    __all__.append('ProvisionAgreementReference')
 
 if not is_model_registered('registry', 'ProvisionAgreement'):
     class ProvisionAgreement(ProvisionAgreement):
@@ -113,23 +88,17 @@ if not is_model_registered('registry', 'ProvisionAgreement'):
 
     __all__.append('ProvisionAgreement')
 
-if not is_model_registered('registry', 'AttachmentConstraintReference'):
-    class AttachmentConstraintReference(AttachmentConstraintReference):
+if not is_model_registered('registry', 'VersionDetail'):
+    class VersionDetail(VersionDetail):
         pass
 
-    __all__.append('AttachmentConstraintReference')
+    __all__.append('VersionDetail')
 
 if not is_model_registered('registry', 'AttachmentConstraint'):
     class AttachmentConstraint(AttachmentConstraint):
         pass
 
     __all__.append('AttachmentConstraint')
-
-if not is_model_registered('registry', 'ContentConstraintReference'):
-    class ContentConstraintReference(ContentConstraintReference):
-        pass
-
-    __all__.append('ContentConstraintReference')
 
 if not is_model_registered('registry', 'ContentConstraint'):
     class ContentConstraint(ContentConstraint):
@@ -184,9 +153,3 @@ if not is_model_registered('registry', 'TimePeriod'):
         pass
 
     __all__.append('TimePeriod')
-
-if not is_model_registered('registry', 'ReleaseCalendar'):
-    class ReleaseCalendar(ReleaseCalendar):
-        pass
-
-    __all__.append('ReleaseCalendar')

@@ -346,7 +346,7 @@ class FieldOptions:
                     self.namespace_key = cls_res._meta.namespace_key
 
         # Set tag
-        self.tag = QName(constants.NAMESPACE_21_MAP.get(self.namespace_key), self.localname)
+        self.tag = QName(constants.NAMESPACE_MAP.get(self.namespace_key), self.localname)
 
         # Set related_name
         if not self.related_name: self.related_name = f'{self.fld.name}_set'

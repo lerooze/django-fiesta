@@ -12,7 +12,7 @@ from ..core.serializers.options import (
     ProcessContextOptions, RESTfulQueryContextOptions)
 from ..core.serializers.structure import StructureSerializer
 from ..core.exceptions import (
-    NotImplementedError, ParseSerializeError, ExternalRequestException
+    NotImplementedError, ParseSerializeError, ExternalError
 )
 
 from ..permissions import HasMaintainablePermission
@@ -33,7 +33,7 @@ class SubmitStructureRequestView(APIView):
         try:
             data = request.data
         except (ParseError, ParseSerializeError, NotImplementedError,
-                ExternalRequestException) as exc:
+                ExternalError) as exc:
             exceptions_file = ContentFile(exc.detail)
             log.exceptions_file.save(f'EXCEPTIONS_{data.m_header.id}', exceptions_file)
             request_file = ContentFile(request.stream)

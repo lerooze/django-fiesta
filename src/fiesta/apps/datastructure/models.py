@@ -1,12 +1,22 @@
 # models.py
 
+from ...core.loading import is_model_registered
+
 from .abstract_models import (
-    Annotation, DataStructureReference, DataStructure, DimensionList, Group,
-    AttributeList, MeasureList, Dimension, GroupDimension, PrimaryMeasure,
-    Attribute, AttributeRelationship, DataflowReference, Dataflow
+    Annotation, 
+    DataStructure, 
+    DimensionList, 
+    Group,
+    AttributeList, 
+    MeasureList, 
+    Dimension, 
+    GroupDimension, 
+    PrimaryMeasure,
+    Attribute, 
+    AttributeRelationship, 
+    Dataflow
 )
 
-from ...core.loading import is_model_registered
 
 __all__ = []
 
@@ -15,12 +25,6 @@ if not is_model_registered('datastructure', 'Annotation'):
         pass
 
     __all__.append('Annotation')
-
-if not is_model_registered('datastructure', 'DataStructureReference'):
-    class DataStructureReference(DataStructureReference):
-        pass
-
-    __all__.append('DataStructureReference')
 
 if not is_model_registered('datastructure', 'DataStructure'):
     class DataStructure(DataStructure):
@@ -81,12 +85,6 @@ if not is_model_registered('datastructure', 'AttributeRelationship'):
         pass
 
     __all__.append('AttributeRelationship')
-
-if not is_model_registered('datastructure', 'DataflowReference'):
-    class DataflowReference(DataflowReference):
-        pass
-
-    __all__.append('DataflowReference')
 
 if not is_model_registered('datastructure', 'Dataflow'):
     class Dataflow(Dataflow):

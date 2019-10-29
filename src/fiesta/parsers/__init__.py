@@ -1,1 +1,1 @@
-from .xml.parser import XMLParser
+from .xml.parser import XMLParser, XMLParser21

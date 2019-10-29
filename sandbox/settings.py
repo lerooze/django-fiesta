@@ -12,7 +12,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'treebeard',
     'rest_framework',
-    'django_extensions',
+    # 'django_extensions',
+    'versionfield',
+    'multi_email_field',
     'fiesta',
     'fiesta.apps.registry',
     'fiesta.apps.common',
@@ -58,14 +60,14 @@ TEMPLATES = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_PARSER_CLASSES': (
+    'DEFAULT_PARSER_CLASSES': [
         'fiesta.parsers.XMLParser21',
         'fiesta.parsers.XMLParser',
-    ),
-    'DEFAULT_RENDERER_CLASSES': (
+    ],
+    'DEFAULT_RENDERER_CLASSES': [        
         'fiesta.renderers.XMLRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    )
+        'rest_framework.renderers.BrowsableAPIRenderer'
+    ]
 }
 
 LANGUAGES = (

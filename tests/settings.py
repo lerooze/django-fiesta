@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'treebeard',
     'rest_framework',
+    'versionfield',
+    'multi_email_field',
     'fiesta',
     'fiesta.apps.registry',
     'fiesta.apps.common',

@@ -1,10 +1,12 @@
 # models.py
 
-from oscar.core.loading import is_model_registered
+from ...core.loading import is_model_registered
 
 from .abstract_models import (
-    Annotation, ConceptSchemeReference, ConceptReference, ConceptScheme,
-    Concept, ISOConceptReference
+    Annotation, 
+    ConceptScheme,
+    Concept, 
+    ISOConceptReference
 )
 
 __all__ = []
@@ -14,18 +16,6 @@ if not is_model_registered('conceptscheme', 'Annotation'):
         pass
 
     __all__.append('Annotation')
-
-if not is_model_registered('conceptscheme', 'ConceptSchemeReference'):
-    class ConceptSchemeReference(ConceptSchemeReference):
-        pass
-
-    __all__.append('ConceptSchemeReference')
-
-if not is_model_registered('conceptscheme', 'ConceptReference'):
-    class ConceptReference(ConceptReference):
-        pass
-
-    __all__.append('ConceptReference')
 
 if not is_model_registered('conceptscheme', 'ConceptScheme'):
     class ConceptScheme(ConceptScheme):

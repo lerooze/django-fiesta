@@ -10,7 +10,7 @@ from .core.exceptions import ExternalError
 
 @dataclass
 class Request:
-    headers: Dict[str: Any] = None 
+    headers: Dict[str, Any] = None 
 
 
     def get(self, location):

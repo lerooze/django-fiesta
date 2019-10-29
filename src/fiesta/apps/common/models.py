@@ -1,9 +1,9 @@
 # managers.py
 
-from oscar.core.loading import is_model_registered
+from ...core.loading import is_model_registered
 
 from .abstract_models import (
-    Format, Representation, ReferencePeriod
+    Format, Representation, Contact
 )
 
 __all__ = []
@@ -21,8 +21,8 @@ if not is_model_registered('common', 'Representation'):
 
     __all__.append('Representation')
 
-if not is_model_registered('common', 'ReferencePeriod'):
-    class ReferencePeriod(ReferencePeriod):
+if not is_model_registered('common', 'Contact'):
+    class Contact(Contact):
         pass
 
-    __all__.append('ReferencePeriod')
+    __all__.append('Contact')

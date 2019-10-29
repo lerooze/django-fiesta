@@ -37,7 +37,7 @@ class User(AbstractUser):
         verbose_name_plural = _('Users')
 
 
-class Annotation(common.Annotation):
+class Annotation(common.AbstractAnnotation):
     agency = models.ForeignKey(
         'base.Agency',
         on_delete=models.CASCADE,
@@ -103,93 +103,12 @@ class Agency(common.AbstractNestedNCNameNameable):
         pass
 
 
-class AgencyContact(common.AbstractContact):
-    container = models.ForeignKey(
-        'base.Agency',
-        on_delete=models.CASCADE,
-        verbose_name=_('Agency'),
-        related_name='contact_set',
-        related_query_name='contact',
-    )
-
-
-class AgencyContactTelephone(common.AbstractTelephone):
-    container = models.ForeignKey(
-        'base.AgencyContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact person'),
-        related_name='telephone_set',
-        related_query_name='telephone',
-    )
-
-    class Meta(common.AbstractTelephone.Meta):
-        abstract = True
-
-
-class AgencyContactFax(common.AbstractFax):
-    container = models.ForeignKey(
-        'base.AgencyContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact person'),
-        related_name='fax_set',
-        related_query_name='fax',
-    )
-
-    class Meta(common.AbstractFax.Meta):
-        abstract = True
-
-
-class AgencyContactX400(common.AbstractX400):
-    container = models.ForeignKey(
-        'base.AgencyContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact person'),
-        related_name='x400_set',
-        related_query_name='x400',
-    )
-
-    class Meta(common.AbstractX400.Meta):
-        abstract = True
-
-
-class AgencyContactEmail(common.AbstractEmail):
-    container = models.ForeignKey(
-        'base.AgencyContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact person'),
-        related_name='email_set',
-        related_query_name='email',
-    )
-
-    class Meta(common.AbstractEmail.Meta):
-        abstract = True
-
-
-class AgencyContactURI(common.AbstractURI):
-    container = models.ForeignKey(
-        'base.AgencyContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact person'),
-        related_name='uri_set',
-        related_query_name='uri',
-    )
-
-    class Meta(common.AbstractURI.Meta):
-        abstract = True
-
-
 class DataProviderScheme(common.AbstractMaintainable):
 
     class Meta(common.AbstractMaintainable.Meta):
         abstract = True
         verbose_name = _('Data provider scheme')
         verbose_name_plural = _('Data provider schemes')
-
-
-class DataProviderReference(common.AbstractItemReference):
-
-    class Meta(common.AbstractItemReference.Meta):
-        abstract = True
 
 
 class DataProvider(common.AbstractItem):
@@ -203,81 +122,6 @@ class DataProvider(common.AbstractItem):
         abstract = True
         verbose_name = _('Data provider')
         verbose_name_plural = _('Data providers')
-
-
-class DataProviderContact(common.AbstractContact):
-    container = models.ForeignKey(
-        'base.DataProvider',
-        on_delete=models.CASCADE,
-        verbose_name=_('Data provider'),
-        related_name='dataprovider_set',
-        related_query_name='dataprovider',
-    )
-
-
-class DataProviderContactTelephone(common.AbstractTelephone):
-    container = models.ForeignKey(
-        'base.DataProviderContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='telephone_set',
-        related_query_name='telephone'
-    )
-
-    class Meta(common.AbstractTelephone.Meta):
-        abstract = True
-
-
-class DataProviderContactFax(common.AbstractFax):
-    container = models.ForeignKey(
-        'base.DataProviderContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='fax_set',
-        related_query_name='fax'
-    )
-
-    class Meta(common.AbstractFax.Meta):
-        abstract = True
-
-
-class DataProviderContactX400(common.AbstractX400):
-    container = models.ForeignKey(
-        'base.DataProviderContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='x400_set',
-        related_query_name='x400'
-    )
-
-    class Meta(common.AbstractX400.Meta):
-        abstract = True
-
-
-class DataProviderContactEmail(common.AbstractEmail):
-    container = models.ForeignKey(
-        'base.DataProviderContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='email_set',
-        related_query_name='email'
-    )
-
-    class Meta(common.AbstractEmail.Meta):
-        abstract = True
-
-
-class DataProviderContactURI(common.AbstractURI):
-    container = models.ForeignKey(
-        'base.DataProviderContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='uri_set',
-        related_query_name='uri'
-    )
-
-    class Meta(common.AbstractURI.Meta):
-        abstract = True
 
 
 class DataConsumerScheme(common.AbstractMaintainable):
@@ -301,81 +145,6 @@ class DataConsumer(common.AbstractItem):
         verbose_name_plural = _('Data consumers')
 
 
-class DataConsumerContact(common.AbstractContact):
-    container = models.ForeignKey(
-        'base.DataConsumer',
-        on_delete=models.CASCADE,
-        verbose_name=_('Data consumer'),
-        related_name='contact_set',
-        related_query_name='contact',
-    )
-
-
-class DataConsumerContactTelephone(common.AbstractTelephone):
-    container = models.ForeignKey(
-        'base.DataConsumerContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='telephone_set',
-        related_query_name='telephone'
-    )
-
-    class Meta(common.AbstractTelephone.Meta):
-        abstract = True
-
-
-class DataConsumerContactFax(common.AbstractFax):
-    container = models.ForeignKey(
-        'base.DataConsumerContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='fax_set',
-        related_query_name='fax'
-    )
-
-    class Meta(common.AbstractFax.Meta):
-        abstract = True
-
-
-class DataConsumerContactX400(common.AbstractX400):
-    container = models.ForeignKey(
-        'base.DataConsumerContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='x400_set',
-        related_query_name='x400'
-    )
-
-    class Meta(common.AbstractX400.Meta):
-        abstract = True
-
-
-class DataConsumerContactEmail(common.AbstractEmail):
-    container = models.ForeignKey(
-        'base.DataConsumerContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='email_set',
-        related_query_name='email'
-    )
-
-    class Meta(common.AbstractEmail.Meta):
-        abstract = True
-
-
-class DataConsumerContactURI(common.AbstractURI):
-    container = models.ForeignKey(
-        'base.DataConsumerContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='uri_set',
-        related_query_name='uri'
-    )
-
-    class Meta(common.AbstractURI.Meta):
-        abstract = True
-
-
 class OrganisationUnitScheme(common.AbstractMaintainable):
 
     class Meta(common.AbstractMaintainable.Meta):
@@ -395,78 +164,3 @@ class OrganisationUnit(common.AbstractItemWithParent):
         abstract = True
         verbose_name = _('Organisation unit')
         verbose_name_plural = _('Organisation units')
-
-
-class OrganisationUnitContact(common.AbstractContact):
-    container = models.ForeignKey(
-        'base.OrganisationUnit',
-        on_delete=models.CASCADE,
-        verbose_name=_('Organisation unit'),
-        related_name='contact_set',
-        related_query_name='contact'
-    )
-
-
-class OrganisationUnitContactTelephone(common.AbstractTelephone):
-    container = models.ForeignKey(
-        'base.OrganisationUnitContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='telephone_set',
-        related_query_name='telephone'
-    )
-
-    class Meta(common.AbstractTelephone.Meta):
-        abstract = True
-
-
-class OrganisationUnitContactFax(common.AbstractFax):
-    container = models.ForeignKey(
-        'base.OrganisationUnitContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='fax_set',
-        related_query_name='fax'
-    )
-
-    class Meta(common.AbstractFax.Meta):
-        abstract = True
-
-
-class OrganisationUnitContactX400(common.AbstractX400):
-    container = models.ForeignKey(
-        'base.OrganisationUnitContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='x400_set',
-        related_query_name='x400'
-    )
-
-    class Meta(common.AbstractX400.Meta):
-        abstract = True
-
-
-class OrganisationUnitContactEmail(common.AbstractEmail):
-    container = models.ForeignKey(
-        'base.OrganisationUnitContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='email_set',
-        related_query_name='email'
-    )
-
-    class Meta(common.AbstractEmail.Meta):
-        abstract = True
-
-
-class OrganisationUnitContactURI(common.AbstractURI):
-    container = models.ForeignKey(
-        'base.OrganisationUnitContact',
-        on_delete=models.CASCADE,
-        verbose_name=_('Contact'),
-        related_name='uri_set',
-        related_query_name='uri'
-    )
-
-    class Meta(common.AbstractURI.Meta):
-        abstract = True

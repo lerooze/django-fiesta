@@ -2,14 +2,14 @@
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from model_utils import Choices
+from versionfield import VersionField
 
 from ...settings import api_settings
 from ..common import abstract_models as common
 
 TINY = api_settings.DEFAULT_TINY_STRING
 
-class Annotation(common.Annotation):
+class Annotation(common.AbstractAnnotation):
     data_structure = models.ForeignKey(
         'datastructure.DataStructure',
         on_delete=models.CASCADE,
@@ -67,7 +67,7 @@ class Annotation(common.Annotation):
         blank=True,
     )
     attribute = models.ForeignKey(
-        'datastructure.Attriubute',
+        'datastructure.Attribute',
         on_delete=models.CASCADE,
         verbose_name=_('Attribute'),
         null=True,
@@ -83,18 +83,12 @@ class Annotation(common.Annotation):
     class Meta:
         abstract = True
 
-class DataStructureReference(common.AbstractReference):
-    class Meta:
-        abstract = True
-        verbose_name = _('Data structure reference')
-        verbose_name_plural = _('Data structure references')
-
 class DataStructure(common.AbstractMaintainable):
 
     class Meta(common.AbstractMaintainable.Meta):
         abstract = True
 
-class AbstractComponentList(common.AbstractAnnotable):
+class AbstractComponentList(models.Model):
 
     data_structure = models.OneToOneField(
         'DataStructure', 
@@ -118,10 +112,10 @@ class Group(common.AbstractIdentifiable):
         verbose_name=_('Data structure')
     )
     attachment_constraint = models.ForeignKey(
-        'registry.AttachmentConstraintReference', 
+        'registry.AttachmentConstraint', 
         on_delete=models.SET_NULL, 
         null=True,
-        verbose_name=_('Attachment constraint reference')
+        verbose_name=_('Attachment constraint')
     )
 
     class Meta:
@@ -148,17 +142,17 @@ class MeasureList(AbstractComponentList):
         abstract = True
 
 class Dimension(common.AbstractComponent):
-    TYPE_CHOICES = Choices( 
-        (0, 'DIMENSION', 'Dimension'),
-        (1, 'TIME_DIMENSION', 'TimeDimension'),
-        (2, 'MEASURE_DIMENSION', 'MeasureDimension')
-    )
+    class Type(models.IntegerChoices):
+        DIMENSION = 0, _('Dimension')
+        TIME_DIMENSION = 1, _('Time dimension')
+        MEASURE_DIMENSION = 2, _('Measure dimension')
+
     container = models.ForeignKey(
         'DimensionList', 
         on_delete=models.CASCADE
     )
     concept_identity = models.ForeignKey(
-        'conceptscheme.ConceptReference',
+        'conceptscheme.Concept',
         on_delete=models.PROTECT,
         related_name='dimension_concept_identity_set',
         related_query_name='dimension_concept_identity',
@@ -170,12 +164,17 @@ class Dimension(common.AbstractComponent):
         verbose_name=_('Local represenation')
     )
     measure_local_representation = models.ForeignKey(
-        'conceptscheme.ConceptSchemeReference', 
+        'conceptscheme.ConceptScheme', 
         on_delete=models.PROTECT,
-        verbose_name=_('Local representation')
+        verbose_name=_('Measure local representation')
+    )
+    local_representation_version = VersionField(
+        _('Measure local representation version'),
+        blank=True,
+        null=True
     )
     concept_role = models.ManyToManyField(
-        'conceptscheme.ConceptReference', 
+        'conceptscheme.Concept', 
         related_name='dimension_conceptrole_set',
         related_query_name='dimension_conceptrole',
         verbose_name=_('Concept roles')
@@ -183,8 +182,8 @@ class Dimension(common.AbstractComponent):
     position = models.IntegerField(_('position'))
     tipe = models.IntegerField(
         _('type'), 
-        choices=TYPE_CHOICES,
-        default=TYPE_CHOICES.DIMENSION
+        choices=Type.choices,
+        default=Type.DIMENSION
     )
 
     class Meta(common.AbstractComponent.Meta):
@@ -192,14 +191,14 @@ class Dimension(common.AbstractComponent):
         verbose_name = 'Dimension'
         verbose_name_plural = 'Dimensions'
 
-class GroupDimension(common.AbstractAnnotable):
+class GroupDimension(models.Model):
 
     container = models.ForeignKey(
         'Group', 
         on_delete=models.CASCADE,
         verbose_name=_('Group')
     )
-    dimension_reference = models.ForeignKey(
+    dimension = models.ForeignKey(
         'Dimension', 
         on_delete=models.CASCADE,
         verbose_name=_('Dimension')
@@ -209,12 +208,12 @@ class GroupDimension(common.AbstractAnnotable):
         abstract = True
         constraints = [
             models.UniqueConstraint(
-                fields=['container', 'dimension_reference'],
+                fields=['container', 'dimension'],
                 name='unique_group_dimension'
             )
         ]
         indexes = [
-            models.Index(fields=['container', 'dimension_reference']),
+            models.Index(fields=['container', 'dimension']),
         ]
         verbose_name = _('Group dimension')
         verbose_name_plural = _('Group dimensions')
@@ -227,7 +226,7 @@ class PrimaryMeasure(common.AbstractComponent):
         verbose_name=_('Measure list')
     )
     concept_identity = models.ForeignKey(
-        'conceptscheme.ConceptReference',
+        'conceptscheme.Concept',
         on_delete=models.PROTECT,
         verbose_name=_('Concept identity')
     )
@@ -243,17 +242,20 @@ class PrimaryMeasure(common.AbstractComponent):
         verbose_name_plural = _('Primary measures')
 
 class Attribute(common.AbstractComponent):
-    ASSIGNMENT_STATUS_CHOICES = Choices(
-        (0, 'MANDATORY', 'Mandatory'),
-        (1, 'CONDITIONAL', 'Conditional')
-    )
+
+
+    class AssignmentStatus(models.IntegerChoices):
+        MANDATORY = 0, _('Mandatory')
+        CONDITIONAL = 1, _('Conditional')
+        
+
     container = models.ForeignKey(
         'AttributeList', 
         on_delete=models.CASCADE,
         verbose_name=_('Attribute list')
     )
     concept_identity = models.ForeignKey(
-        'conceptscheme.ConceptReference',
+        'conceptscheme.Concept',
         on_delete=models.PROTECT,
         related_name='attribute_concept_identity_set',
         related_query_name='attribute_concept_identity',
@@ -265,14 +267,14 @@ class Attribute(common.AbstractComponent):
         verbose_name=_('Local represenation')
     )
     concept_role = models.ManyToManyField(
-        'conceptscheme.ConceptReference', 
+        'conceptscheme.Concept', 
         related_name='attribute_concept_role_set',
         related_query_name='attribute_concept_role',
         verbose_name=_('Concept roles')
     )
     assignment_status = models.IntegerField(
         _('Assignment status'),
-        choices=ASSIGNMENT_STATUS_CHOICES
+        choices=AssignmentStatus.choices
     )
 
     class Meta(common.AbstractComponent.Meta):
@@ -315,15 +317,9 @@ class AttributeRelationship(models.Model):
     class Meta:
         abstract = True
 
-class DataflowReference(common.AbstractReference):
-    class Meta:
-        abstract = True
-        verbose_name = _('Dataflow reference')
-        verbose_name_plural = _('Dataflow references')
-
 class Dataflow(common.AbstractMaintainable):
     structure = models.ForeignKey(
-        'DataStructureReference', 
+        'DataStructure', 
         on_delete=models.PROTECT,
         verbose_name=_('Data structure reference')
     )

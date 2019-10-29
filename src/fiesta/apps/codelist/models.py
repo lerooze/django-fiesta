@@ -1,8 +1,8 @@
 # models.py
 
-from oscar.core.loading import is_model_registered
+from ...core.loading import is_model_registered
 
-from .abstract_models import Annotation, CodelistReference, Codelist, Code
+from .abstract_models import Annotation, Codelist, Code
 
 __all__ = []
 
@@ -11,12 +11,6 @@ if not is_model_registered('codelist', 'Annotation'):
         pass
 
     __all__.append('Annotation')
-
-if not is_model_registered('codelist', 'CodelistReference'):
-    class CodelistReference(CodelistReference):
-        pass
-
-    __all__.append('CodelistReference')
 
 if not is_model_registered('codelist', 'Codelist'):
     class Codelist(Codelist):

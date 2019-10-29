@@ -9,12 +9,12 @@ from decimal import Decimal
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.db import transaction, ProtectedError
-from django.db.models import Q
+from django.db import transaction 
+from django.db.models import Q, ProtectedError
 from django.utils import translation
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import ExternalError
+from rest_framework.exceptions import ParseError
 from importlib import import_module
 from lxml.etree import QName
 from typing import Iterable, List
@@ -23,6 +23,7 @@ from .. import status, constants, patterns
 from ...utils.translation import get_language
 from ...settings import api_settings
 from ...external import Request as ExternalRequest
+from ..exceptions import ExternalError
 
 from .base import field, Serializer, EmptySerializer
 
@@ -250,8 +251,8 @@ class AnnotationSerializer(Serializer):
 
     class Meta:
         app_name = 'common'
-        model_name = 'Annotation'
-        namespace_key = 'common'
+        # model_name = 'Annotation'
+        # namespace_key = 'common'
 
     def process_premake(self):
         obj, _ = self._meta.model.objects.get_or_create(
@@ -718,153 +719,24 @@ class AgencySerializer(ItemSerializer):
         if not '.' in self.object_id: return self.object_id
         return self.object_id.split('.')[-1]
 
-class DataProviderContactTelephoneSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataprovidercontacttelephone'
-
-
-class DataProviderContactFaxSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataprovidercontactfax'
-
-class DataProviderContactX400Serializer(SimpleStringContactSerializer):
-    pass
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataprovidercontactx400'
-
-class DataProviderContactURISerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataprovidercontacturi'
-
-class DataProviderContactEmailSerializer(SimpleStringContactSerializer):
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataprovidercontactemail'
-
-class DataProviderContactSerializer(BaseContactSerializer):
-    telephone: Iterable[DataProviderContactTelephoneSerializer] = field(forward_accesor='dataprovidercontacttelephone_set')
-    fax: Iterable[DataProviderContactFaxSerializer] = field(forward_accesor='dataprovidercontactfax_set')
-    x400: Iterable[DataProviderContactX400Serializer] = field(forward_accesor='dataprovidercontactx400_set')
-    uri: Iterable[DataProviderContactURISerializer] = field(localname='URI', forward_accesor='dataprovidercontacturi_set')
-    email: Iterable[DataProviderContactEmailSerializer] = field(forward_accesor='dataprovidercontactemail_set')
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataprovidercontact'
-        namespace_key = 'message'
-
 class DataProviderSerializer(ItemSerializer):
-    contact: Iterable[DataProviderContactSerializer] = field(forward_accesor='dataprovidercontact_set')
+    contact: Iterable[ContactSerializer] = field(forward_accesor='dataprovidercontact_set')
 
     class Meta:
         app_name = 'base'
         model_name = 'dataprovider'
         namespace_key = 'structure'
 
-class DataConsumerContactTelephoneSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataconsumercontacttelephone'
-
-
-class DataConsumerContactFaxSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataconsumercontactfax'
-
-class DataConsumerContactX400Serializer(SimpleStringContactSerializer):
-    pass
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataconsumercontactx400'
-
-class DataConsumerContactURISerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataconsumercontacturi'
-
-class DataConsumerContactEmailSerializer(SimpleStringContactSerializer):
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataconsumercontactemail'
-
-class DataConsumerContactSerializer(BaseContactSerializer):
-    telephone: Iterable[DataConsumerContactTelephoneSerializer] = field(forward_accesor='dataconsumercontacttelephone_set')
-    fax: Iterable[DataConsumerContactFaxSerializer] = field(forward_accesor='dataconsumercontactfax_set')
-    x400: Iterable[DataConsumerContactX400Serializer] = field(forward_accesor='dataconsumercontactx400_set')
-    uri: Iterable[DataConsumerContactURISerializer] = field(localname='URI', forward_accesor='dataconsumercontacturi_set')
-    email: Iterable[DataConsumerContactEmailSerializer] = field(forward_accesor='dataconsumercontactemail_set')
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'dataconsumercontact'
-        namespace_key = 'message'
-
 class DataConsumerSerializer(ItemSerializer):
-    contact: Iterable[DataConsumerContactSerializer] = field(forward_accesor='dataconsumercontact_set')
+    contact: Iterable[ContactSerializer] = field(forward_accesor='dataconsumercontact_set')
 
     class Meta:
         app_name = 'base'
         model_name = 'dataconsumer'
         namespace_key = 'structure'
 
-class OrganisationUnitContactTelephoneSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'organisationunitcontacttelephone'
-
-
-class OrganisationUnitContactFaxSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'organisationunitcontactfax'
-
-class OrganisationUnitContactX400Serializer(SimpleStringContactSerializer):
-    pass
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'organisationunitcontactx400'
-
-class OrganisationUnitContactURISerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'organisationunitcontacturi'
-
-class OrganisationUnitContactEmailSerializer(SimpleStringContactSerializer):
-    class Meta:
-        app_name = 'base'
-        model_name = 'organisationunitcontactemail'
-
-class OrganisationUnitContactSerializer(BaseContactSerializer):
-    telephone: Iterable[OrganisationUnitContactTelephoneSerializer] = field(forward_accesor='organisationunitcontacttelephone_set')
-    fax: Iterable[OrganisationUnitContactFaxSerializer] = field(forward_accesor='organisationunitcontactfax_set')
-    x400: Iterable[OrganisationUnitContactX400Serializer] = field(forward_accesor='organisationunitcontactx400_set')
-    uri: Iterable[OrganisationUnitContactURISerializer] = field(localname='URI', forward_accesor='organisationunitcontacturi_set')
-    email: Iterable[OrganisationUnitContactEmailSerializer] = field(forward_accesor='organisationunitcontactemail_set')
-
-    class Meta:
-        app_name = 'base'
-        model_name = 'organisationunitcontact'
-        namespace_key = 'message'
-
 class OrganisationUnitSerializer(ItemWithParentSerializer):
-    contact: Iterable[OrganisationUnitContactSerializer] = field(forward_accesor='organisationunitcontact_set')
+    contact: Iterable[ContactSerializer] = field(forward_accesor='organisationunitcontact_set')
 
     class Meta:
         app_name = 'base'
@@ -973,49 +845,20 @@ class OrganisationSchemesSerializer(StructuresItemsSerializer):
         app_name = 'base'
         namespace_key = 'structure'
 
-class TelephoneSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'registry'
-        model_name = 'telephone'
-
-class FaxSerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'registry'
-        model_name = 'fax'
-
-class X400Serializer(SimpleStringContactSerializer):
+class ContactSerializer(Serializer):
     pass
+    # telephone: Iterable[TelephoneSerializer] = field()
+    # fax: Iterable[FaxSerializer] = field()
+    # x400: Iterable[X400Serializer] = field()
+    # uri: Iterable[URISerializer] = field(localname='URI')
+    # email: Iterable[EmailSerializer] = field()
+    #
+    # class Meta:
+    #     app_name = 'registry'
+    #     model_name = 'contact'
+    #     namespace_key = 'message'
 
-    class Meta:
-        app_name = 'registry'
-        model_name = 'x400'
-
-class URISerializer(SimpleStringContactSerializer):
-
-    class Meta:
-        app_name = 'registry'
-        model_name = 'uri'
-
-class EmailSerializer(SimpleStringContactSerializer):
-    class Meta:
-        app_name = 'registry'
-        model_name = 'email'
-
-class ContactSerializer(BaseContactSerializer):
-    telephone: Iterable[TelephoneSerializer] = field()
-    fax: Iterable[FaxSerializer] = field()
-    x400: Iterable[X400Serializer] = field()
-    uri: Iterable[URISerializer] = field(localname='URI')
-    email: Iterable[EmailSerializer] = field()
-
-    class Meta:
-        app_name = 'registry'
-        model_name = 'contact'
-        namespace_key = 'message'
-
-class HeaderContactSerializer(BaseContactSerializer):
+class HeaderContactSerializer(Serializer):
 
     def process_premake(self):
         return self._meta.model.objects.create(
@@ -1036,8 +879,8 @@ class PartySerializer(Serializer):
 
     class Meta:
         app_name = 'base'
-        model_name = 'Party'
-        namespace_key = 'message'
+        # model_name = 'Party'
+        # namespace_key = 'message'
 
     def process_premake(self):
         obj = self._meta.model.objects.create(
@@ -1667,7 +1510,7 @@ class AttachmentConstraintAttachmentSerializer(Serializer):
     # constraints must be defined in structural metadata (DSD) and be given a unique identifier,
     # thus should be attached to datastructure 
 
-    data_structure: Iterable[MaintainableReferenceSerializer] = field(related_name='datastructure_set', FormatSerializer='data_structures')
+    data_structure: Iterable[MaintainableReferenceSerializer] = field(related_name='datastructure_set')
 
     class Meta:
         namespace_key = 'structure'
@@ -1759,8 +1602,8 @@ class TimePeriodSerializer(StringSerializer):
     is_inclusive: bool = field(is_attribute=True, default=True)
 
     class Meta:
-        app_name = 'registry'
-        model_name = 'timeperiod'
+        # app_name = 'registry'
+        # model_name = 'timeperiod'
         namespace_key = 'structure'
 
     def process_premake(self):
@@ -1871,8 +1714,8 @@ class ReleaseCalendarSerializer(Serializer):
     tolerance: StringSerializer = field(is_text=True)
 
     class Meta:
-        app_name = 'registry'
-        model_name = 'releasecalendar'
+        # app_name = 'registry'
+        # model_name = 'releasecalendar'
         namespace_key = 'structure'
 
     def process_premake(self):
@@ -1888,8 +1731,8 @@ class ReferencePeriodSerializer(Serializer):
     end_time: datetime = field()
 
     class Meta:
-        app_name = 'common'
-        model_name = 'referenceperiod'
+        # app_name = 'common'
+        # model_name = 'referenceperiod'
         namespace_key = 'common'
 
     def process_premake(self):

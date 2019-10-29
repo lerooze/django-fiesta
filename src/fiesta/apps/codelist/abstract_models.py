@@ -5,7 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 from ..common import abstract_models as common 
 
-class Annotation(common.Annotation):
+
+class Annotation(common.AbstractAnnotation):
     codelist = models.ForeignKey(
         'codelist.Codelist',
         on_delete=models.CASCADE,
@@ -24,12 +25,6 @@ class Annotation(common.Annotation):
     class Meta:
         abstract = True
 
-class CodelistReference(common.AbstractReference):
-
-    class Meta:
-        abstract = True
-        verbose_name = _('Codelist reference')
-        verbose_name_plural = _('Codelist references')
 
 class Codelist(common.AbstractNCNameMaintainable):
 
@@ -37,6 +32,7 @@ class Codelist(common.AbstractNCNameMaintainable):
         abstract = True
         verbose_name = _('Codelist')
         verbose_name_plural = _('Codelists')
+
 
 class Code(common.AbstractItemWithParent):
 

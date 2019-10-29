@@ -3,18 +3,21 @@
 from modeltranslation.translator import translator, TranslationOptions
 
 from ..common.translation import (
-    NameableTranslation, ContactTranslation, AnnotationTranslation
+    NameableTranslation, AnnotationTranslation
 )
 
 from .models import (
-    Header, Party, Contact, Annotation, AttachmentConstraint,
+    Header, Party, Annotation, AttachmentConstraint,
     ContentConstraint, ProvisionAgreement
 )
 
 class HeaderTranslation(TranslationOptions):
     fields = ['name', 'source'] 
 
+class PartyTranslation(TranslationOptions):
+    fields = ['name'] 
+
 translator.register(Annotation, AnnotationTranslation)
-translator.register([Party, AttachmentConstraint, ContentConstraint, ProvisionAgreement], NameableTranslation)
-translator.register(Contact, ContactTranslation)
+translator.register(Party, PartyTranslation)
+translator.register([AttachmentConstraint, ContentConstraint, ProvisionAgreement], NameableTranslation)
 translator.register(Header, HeaderTranslation)

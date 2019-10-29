@@ -17,6 +17,7 @@ patterns = {
     'NestedNCNameIDType': r"[A-Za-z][A-Za-z0-9_\-]*(\.[A-Za-z][A-Za-z0-9_\-]*)*",
     'SingleNCNameIDType': r"[A-Za-z][A-Za-z0-9_\-]*",
     'VersionType': r"[0-9]+(\.[0-9]+)*",
+    'FullVersionType': r"[0-9]+\.[0-9]+\.[0-9]",
 }
 
 re_validators = {

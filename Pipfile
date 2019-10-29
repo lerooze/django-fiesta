@@ -15,7 +15,6 @@ flake8 = "*"
 flake8-tidy-imports = "*"
 pycodestyle = "*"
 isort = "*"
-django-fiesta = {editable = true,path = "."}
 pytest-xdist = "*"
 pdbpp = "*"
 pytest-spec = "*"
@@ -24,15 +23,17 @@ pydotplus = "*"
 
 [packages]
 lxml = "*"
-djangorestframework = "*"
 inflection = "*"
 django-treebeard = "*"
 python-dateutil = "*"
 requests = "*"
 isodate = "*"
-django-modeltranslation = "*"
 django-fiesta = {editable = true,path = "."}
 django = "*"
+django-multi-email-field = {editable = true,git = "https://github.com/TheBimHub/django-multi-email-field.git",ref = "django2.2"}
+django-versionfield = {editable = true,git = "https://github.com/lerooze/django-versionfield.git",ref = "django3"}
+django-modeltranslation = {editable = true,git = "https://github.com/deschler/django-modeltranslation.git"}
+django-rest-framework = {editable = true,git = "https://github.com/encode/django-rest-framework.git"}
 
 [requires]
 python_version = "3.7"
