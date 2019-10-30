@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "19c37e06da4bb31f82c2a7455e22f90a78633088605d3b02f69e58e22a9b7584"
+            "sha256": "527a6ab8eaaed28ba9c6f8355efefb493c20f7e087e48c116ddfb141c16070b1"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -76,6 +76,19 @@
             "git": "https://github.com/lerooze/django-versionfield.git",
             "ref": "c46b393658ae8935c3f01d1167d29155235549db"
         },
+        "dnspython": {
+            "hashes": [
+                "sha256:36c5e8e38d4369a08b6780b7f27d790a292b2b08eea01607865bf0936c558e01",
+                "sha256:f69c21288a962f4da86e56c4905b49d11aba7938d3d740e80d9e366ee4f1632d"
+            ],
+            "version": "==1.16.0"
+        },
+        "email-validator": {
+            "hashes": [
+                "sha256:e3e6ede1765d7c1e580d2050d834b2689361f7da2d50ce74df6a5968fca7cb13"
+            ],
+            "version": "==1.0.5"
+        },
         "idna": {
             "hashes": [
                 "sha256:c357b3f628cf53ae2c4c05627ecc484553142ca23264e593d327bcde5e9c3407",
@@ -130,6 +143,15 @@
             "index": "pypi",
             "version": "==4.4.1"
         },
+        "pydantic": {
+            "editable": true,
+            "extras": [
+                "email",
+                "typing_extensions"
+            ],
+            "git": "http://github.com/samuelcolvin/pydantic",
+            "ref": "347be1cc3c728a8f60d097e1d567faf30f46207e"
+        },
         "python-dateutil": {
             "hashes": [
                 "sha256:7e6584c74aeed623791615e26efd690f29817a27c73085b78e4bad02493df2fb",
@@ -166,6 +188,14 @@
                 "sha256:7c3dca29c022744e95b547e867cee89f4fce4373f3549ccd8797d8eb52cdb873"
             ],
             "version": "==0.3.0"
+        },
+        "typing-extensions": {
+            "hashes": [
+                "sha256:091ecc894d5e908ac75209f10d5b4f118fbdb2eb1ede6a63544054bb1edb41f2",
+                "sha256:910f4656f54de5993ad9304959ce9bb903f90aadc7c67a0bef07e678014e892d",
+                "sha256:cf8b63fedea4d89bab840ecbb93e75578af28f76f66c35889bd7065f5af88575"
+            ],
+            "version": "==3.7.4.1"
         },
         "urllib3": {
             "hashes": [

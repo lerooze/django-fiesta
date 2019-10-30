@@ -34,6 +34,7 @@ django-multi-email-field = {editable = true,git = "https://github.com/TheBimHub/
 django-versionfield = {editable = true,git = "https://github.com/lerooze/django-versionfield.git",ref = "django3"}
 django-modeltranslation = {editable = true,git = "https://github.com/deschler/django-modeltranslation.git"}
 django-rest-framework = {editable = true,git = "https://github.com/encode/django-rest-framework.git"}
+pydantic = {editable = true,extras = ["email", "typing_extensions"],git = "http://github.com/samuelcolvin/pydantic",ref = "master"}
 
 [requires]
 python_version = "3.7"

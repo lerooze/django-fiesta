@@ -23,18 +23,26 @@ install_requires = [
     'django',
     # for REST web services
     'djangorestframework',
+    # for hierarchical models
+    'django-treebeard',
+    # for localization
+    'django-modeltranslation',
+    # for version field
+    'django-versionfield2',
+    # for multi email field
+    'django-multi-email-field',
+    # for serializers 
+    'pydantic',
     # lxml for xml parsing, schema validation and xml generation
     'lxml',
     # for manipulating strings
     'inflection',
-    # for hierarchical models
-    'django-treebeard',
     # for manipulating dates
     'python-dateutil',
     # for external sdmx requests
     'requests',
     # for manipulating time deltas
-    'isodate'
+    'isodate',
 ]
 
 docs_requires = [

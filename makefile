@@ -52,8 +52,8 @@ test_migrations:
 	cd sandbox && ./test_migrations.sh
 
 test:
-	# This runs all of the tests, on both Python 2 and Python 3.
-	detox
+	# This runs all of the tests
+	tox
 
 ######################
 # Project Management
